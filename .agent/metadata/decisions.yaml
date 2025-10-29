@@ -1,0 +1,266 @@
+# Architecture Decision Records (ADRs) - LightWave Media
+# Purpose: Every architectural decision tells a story about WHY the system is designed this way
+# Synced from: <NOTION_PAGE_URL>
+# Last updated: <YYYY-MM-DD>
+
+version: 1.0.0
+philosophy: |
+  Architecture Decision Records capture the context, decision, and consequences
+  of significant technical choices. They answer the "why" questions that code cannot.
+
+  Format inspired by Michael Nygard's ADR template.
+
+# Notion Sync Configuration
+notion_sync:
+  source_database: "Global Documents DB"
+  filters:
+    - field: "Document Type"
+      equals: "ADR"
+    - field: "Status"
+      equals: "Active"  # Only sync Active decisions
+    - field: "Agent Tags"
+      contains: "agent:v_senior_developer"
+
+  status_mapping:
+    Active: "Claude Code sees this decision"
+    Draft: "Hidden from Claude Code (still being written)"
+    Deprecated: "Hidden from Claude Code (no longer valid)"
+    Superseded: "Hidden from Claude Code (replaced by newer ADR)"
+
+  sync_frequency: "On task start, or manual trigger"
+  last_synced: "<YYYY-MM-DD HH:MM:SS>"
+
+# Status Lifecycle
+status_lifecycle:
+  flow: "Draft → Active → Deprecated → Superseded"
+
+  Draft:
+    purpose: "Decision is being discussed/written"
+    visibility: "Hidden from Claude Code"
+    use_when: "Exploring options, not yet committed"
+
+  Active:
+    purpose: "Current, approved decision that Claude Code should follow"
+    visibility: "Visible to Claude Code"
+    use_when: "Decision is finalized and implemented"
+
+  Deprecated:
+    purpose: "No longer recommended, but not yet replaced"
+    visibility: "Hidden from Claude Code"
+    use_when: "Decision is outdated but no replacement exists yet"
+
+  Superseded:
+    purpose: "Replaced by a newer ADR"
+    visibility: "Hidden from Claude Code"
+    use_when: "New ADR exists, old approach no longer valid"
+    requires: "superseded_by field must point to new ADR"
+
+# Decision Registry
+# NOTE: Only decisions with status="Active" are synced from Notion
+# Draft/Deprecated/Superseded decisions are filtered out
+
+decisions:
+  - id: "ADR-001"
+    date: "<YYYY-MM-DD>"
+    status: "Active"  # Must be "Active" to appear in this file
+    notion_status: "<Notion Status field value>"  # Synced from Notion
+    title: "<Short title describing the decision>"
+
+    context: |
+      <What is the issue we're facing?>
+      <What factors are driving this decision?>
+      <What constraints exist?>
+
+    decision: |
+      <What did we decide to do?>
+      <What alternatives were considered?>
+      <Why did we choose this option?>
+
+    consequences:
+      positive:
+        - "<Benefit 1>"
+        - "<Benefit 2>"
+      negative:
+        - "<Tradeoff 1>"
+        - "<Tradeoff 2>"
+      neutral:
+        - "<Other impact 1>"
+
+    supersedes: "<ADR-XXX if this replaces an old decision>"
+    superseded_by: null  # If not null, this ADR should have status="Superseded"
+
+    related_docs:
+      - "<Link to technical spec>"
+      - "<Link to implementation guide>"
+
+    tags:
+      - "<infrastructure|frontend|backend|auth|deployment|etc.>"
+
+    # Notion metadata (for traceability)
+    notion_id: "<NOTION_PAGE_ID>"
+    notion_url: "<https://notion.so/page-id>"
+    agent_tags:
+      - "agent:v_senior_developer"
+      - "agent:v_product_architect"
+
+# Example ADR: Infrastructure Split
+  - id: "ADR-002"
+    date: "2024-XX-XX"
+    status: "Accepted"
+    title: "Use Cloudflare Pages for frontend, AWS ECS for backend"
+
+    context: |
+      <FILL IN: Why was this decision needed?>
+      - Need edge performance for static frontend sites
+      - Backend requires stateful services (PostgreSQL, Redis)
+      - Cost optimization for different workload types
+
+    decision: |
+      <FILL IN: What was decided?>
+      - Frontend sites deploy to Cloudflare Pages (static/SSG)
+      - Backend API deploys to AWS ECS Fargate (containerized Django)
+      - DNS managed via Cloudflare for both
+
+    consequences:
+      positive:
+        - "<BENEFIT 1>"
+        - "<BENEFIT 2>"
+      negative:
+        - "<TRADEOFF 1>"
+        - "<TRADEOFF 2>"
+      neutral:
+        - "<IMPACT 1>"
+
+    supersedes: null
+    superseded_by: null
+
+    related_docs:
+      - ".agent/metadata/deployment.yaml"
+      - ".agent/metadata/tech_stack.yaml"
+
+    tags:
+      - "infrastructure"
+      - "deployment"
+
+# Example ADR: Monorepo vs Polyrepo
+  - id: "ADR-003"
+    date: "2024-XX-XX"
+    status: "Accepted"
+    title: "Use domain-based polyrepo structure"
+
+    context: |
+      <FILL IN: Why organize repos this way?>
+      - Multiple frontend sites serving different domains
+      - Shared backend platform
+      - Need independent deployment cycles
+
+    decision: |
+      <FILL IN: What was decided?>
+      - Separate repos per frontend domain (cineos, photographos, etc.)
+      - Shared platform repo (backend + lightwave-ui)
+      - Shared packages via npm (@lightwave/*)
+
+    consequences:
+      positive:
+        - "<BENEFIT 1>"
+        - "<BENEFIT 2>"
+      negative:
+        - "<TRADEOFF 1>"
+        - "<TRADEOFF 2>"
+      neutral:
+        - "<IMPACT 1>"
+
+    supersedes: null
+    superseded_by: null
+
+    related_docs:
+      - ".agent/metadata/namespaces.yaml"
+      - "CLAUDE.md#workspace-structure"
+
+    tags:
+      - "repository-structure"
+      - "architecture"
+
+# Example ADR: Authentication Strategy
+  - id: "ADR-004"
+    date: "2024-XX-XX"
+    status: "Accepted"
+    title: "Use Django sessions with httpOnly cookies for auth"
+
+    context: |
+      <FILL IN: Why this auth approach?>
+      - Need secure authentication across domains
+      - Frontend sites are stateless (Next.js)
+      - Backend handles all auth logic
+
+    decision: |
+      <FILL IN: What was decided?>
+      - Django session-based auth with httpOnly cookies
+      - Frontend calls /api/auth/session to check login state
+      - Future migration path to OAuth2/JWT if needed
+
+    consequences:
+      positive:
+        - "<BENEFIT 1>"
+        - "<BENEFIT 2>"
+      negative:
+        - "<TRADEOFF 1>"
+        - "<TRADEOFF 2>"
+      neutral:
+        - "<IMPACT 1>"
+
+    supersedes: null
+    superseded_by: null
+
+    related_docs:
+      - ".agent/tasks/django_auth_endpoints.yaml"
+      - ".agent/tasks/auth_client.yaml"
+
+    tags:
+      - "auth"
+      - "security"
+      - "backend"
+
+# Template for New Decisions
+  - id: "ADR-XXX"
+    date: "<YYYY-MM-DD>"
+    status: "Proposed"
+    title: "<Decision title>"
+
+    context: |
+      <What is the problem or opportunity?>
+
+    decision: |
+      <What did we decide?>
+
+    consequences:
+      positive: []
+      negative: []
+      neutral: []
+
+    supersedes: null
+    superseded_by: null
+
+    related_docs: []
+
+    tags: []
+
+# Story-Driven Questions This Answers
+answers:
+  - question: "Why did we choose AWS for the backend?"
+    answer: "See ADR-002 - needed PostgreSQL/Redis, considered alternatives"
+
+  - question: "Why separate repos instead of monorepo?"
+    answer: "See ADR-003 - independent deployment cycles per domain"
+
+  - question: "Why session auth instead of JWT?"
+    answer: "See ADR-004 - security + simplicity, with migration path to JWT"
+
+  - question: "When was this decision made and what was the context?"
+    answer: "Each ADR includes date, context, and decision rationale"
+
+# Cross-reference
+related:
+  tech_stack: ".agent/metadata/tech_stack.yaml"
+  deployment: ".agent/metadata/deployment.yaml"
+  architecture: ".agent/metadata/frontend_architecture.yaml"

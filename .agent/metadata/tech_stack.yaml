@@ -1,0 +1,127 @@
+# Technology Stack Metadata
+# Version: 1.0.0
+# Last Updated: 2025-10-25
+
+version: "1.0.0"
+last_updated: "2025-10-25"
+owner: "Joel Schaeffer"
+status: "active"
+
+frontend:
+  framework:
+    name: "Next.js"
+    version: "15.x"
+    rationale: "Industry standard, excellent DX, React Server Components"
+  
+  cms:
+    name: "Payload CMS"
+    version: "2.x"
+    rationale: "TypeScript-first, code-based config, self-hosted"
+  
+  design_system:
+    name: "Untitled UI"
+    package: "@lightwave/ui"
+    location: "Backend/Lightwave-Platform/lightwave-ui/"
+    rationale: "Professional design, 250+ components, Tailwind v4"
+  
+  styling:
+    name: "Tailwind CSS"
+    version: "4.x"
+    rationale: "Utility-first, fast development, small bundles"
+
+backend:
+  framework:
+    name: "Django"
+    version: "5.0"
+    rationale: "Batteries included, mature ORM, built-in auth"
+  
+  api:
+    name: "Django REST Framework"
+    rationale: "Industry standard, comprehensive, well-documented"
+  
+  database:
+    name: "PostgreSQL"
+    version: "15+"
+    rationale: "Robust, JSON support, full-text search"
+  
+  cache:
+    name: "Redis"
+    uses: ["sessions", "cache", "celery_broker"]
+  
+  task_queue:
+    name: "Celery"
+    broker: "Redis"
+
+testing:
+  coverage_requirement: "100%"
+  philosophy: "Test-driven development (TDD)"
+  
+  frontend:
+    unit: "Vitest"
+    component: "React Testing Library"
+    e2e: "Playwright"
+    browsers: ["chromium", "firefox", "webkit"]
+  
+  backend:
+    unit: "pytest"
+    integration: "pytest + Django TestCase"
+    api: "pytest + DRF APITestCase"
+
+package_managers:
+  frontend:
+    name: "pnpm"
+    version: "8.x"
+    reason: "Required by Payload CMS, workspace support"
+  
+  backend:
+    name: "uv"
+    reason: "LightWave standard, fast, modern"
+
+deployment:
+  frontend:
+    platform: "Cloudflare Pages"
+    build_command: "pnpm build"
+    output_dir: ".next"
+    node_version: "18.x"
+  
+  backend:
+    platform: "AWS ECS Fargate"
+    region: "us-east-1"
+    container: "Django + uWSGI"
+  
+  database:
+    platform: "AWS RDS PostgreSQL"
+    multi_az: true  # production only
+
+security:
+  authentication:
+    current: "Django sessions (cookies)"
+    future: "JWT tokens (mobile apps)"
+  
+  cors:
+    enabled: true
+    origins:
+      - "https://lightwave-media.site"
+      - "https://joelschaeffer.com"
+      - "http://localhost:3000"  # dev only
+  
+  csrf:
+    enabled: true
+    cookie_secure: true
+    cookie_httponly: true
+    cookie_samesite: "Lax"
+
+performance_targets:
+  frontend:
+    lighthouse: ">= 90"
+    fcp: "< 1.5s"
+    tti: "< 3s"
+  
+  backend:
+    api_response: "< 200ms (p95)"
+    database_query: "< 50ms (p95)"
+
+related_docs:
+  - ".agent/metadata/frontend_architecture.yaml"
+  - ".agent/metadata/packages.json"
+  - ".claude/FRONTEND_STACK.md"

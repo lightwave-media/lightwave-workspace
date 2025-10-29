@@ -1,0 +1,217 @@
+# ============================================================================
+# Task: Fix Ruff Linting Errors (78-81 errors blocking CI/CD)
+# ============================================================================
+# Created: 2025-10-27
+# Status: Ready for Implementation
+# Priority: HIGH - Blocking CI/CD deployment
+# Assignee: TBD (next session)
+# ============================================================================
+
+metadata:
+  title: "Fix All Ruff Linting Errors to Pass CI/CD"
+  type: "code-quality"
+  sprint: "Production Readiness"
+  labels: ["linting", "code-quality", "django", "blocking"]
+  estimated_effort: "2-3 hours"
+
+# ============================================================================
+# Problem Statement
+# ============================================================================
+problem: |
+  Ruff linting fails in CI/CD with 78-81 errors across 3 categories:
+
+  1. DJ001 (Django): null=True on string fields (CharField, EmailField)
+     - Django best practice: Use blank=True with default="" instead
+     - Requires database migrations to fix
+     - ~60 occurrences across models
+
+  2. DJ008/DJ012 (Django): Missing __str__ methods and incorrect class ordering
+     - Model classes should have __str__ for admin readability
+     - Meta class should come before magic methods
+     - ~10 occurrences
+
+  3. PLR0911/PLR0912/PLR0915 (Pylint): Code complexity
+     - Too many return statements (>6)
+     - Too many branches (>12)
+     - Too many statements (>50)
+     - ~8 occurrences in ai_services/
+
+  Current CI/CD workflow has exit-code: 1 on linting failures, blocking deployment.
+
+# ============================================================================
+# Root Cause
+# ============================================================================
+root_cause: |
+  Pre-commit hooks were NOT configured, allowing linting errors to reach CI/CD.
+  Developers were committing code without local validation.
+
+  This session fixed the infrastructure (pre-commit hooks created) but did NOT
+  fix the existing linting errors in the codebase.
+
+# ============================================================================
+# Acceptance Criteria
+# ============================================================================
+acceptance_criteria:
+  - [ ] All 78-81 ruff linting errors are resolved
+  - [ ] ruff check . exits with 0 errors locally
+  - [ ] CI/CD linting job passes in GitHub Actions
+  - [ ] Database migrations created for DJ001 fixes (if needed)
+  - [ ] All models have __str__ methods (DJ008)
+  - [ ] Complex functions refactored (PLR rules)
+  - [ ] Pre-commit hooks pass before commit
+  - [ ] No regressions introduced (all tests still pass)
+
+# ============================================================================
+# Implementation Plan
+# ============================================================================
+implementation_steps:
+  1_analyze_errors:
+    description: "Generate full error report"
+    commands:
+      - "cd backend && ruff check . --output-format=json > ruff_errors.json"
+      - "python3 -c \"import json; errors = json.load(open('ruff_errors.json')); print(f'Total: {len(errors)} errors'); import collections; print(collections.Counter([e['code'] for e in errors]))\""
+    expected_output: "Categorized breakdown of error types and counts"
+
+  2_fix_dj001_nullable_strings:
+    description: "Fix DJ001: Remove null=True from string fields"
+    files_affected:
+      - apps/accounts/models.py
+      - apps/addresses/models.py
+      - apps/analytics/models.py
+      - apps/billing/models.py
+      - apps/users/models.py
+    approach: |
+      For each CharField/EmailField with null=True:
+      1. Remove null=True
+      2. Add default="" (empty string default)
+      3. Keep blank=True if field is optional
+      4. Create migration: python manage.py makemigrations
+      5. Test migration: python manage.py migrate --check
+    example: |
+      # Before
+      full_name = models.CharField(max_length=255, blank=True, null=True)
+
+      # After
+      full_name = models.CharField(max_length=255, blank=True, default="")
+
+  3_fix_dj008_missing_str:
+    description: "Fix DJ008/DJ012: Add __str__ methods and reorder classes"
+    approach: |
+      For each model missing __str__:
+      1. Add meaningful __str__ method (return human-readable string)
+      2. Move Meta class before magic methods if needed
+      3. Follow Django style guide ordering:
+         - Fields
+         - Meta class
+         - Magic methods (__str__, __repr__)
+         - Manager methods
+         - Custom methods
+
+  4_fix_plr_complexity:
+    description: "Fix PLR0911/PLR0912/PLR0915: Reduce code complexity"
+    files_affected:
+      - apps/ai_services/integrations/notion_client.py (PLR0911)
+      - apps/ai_services/mcp/tool_implementations/create_task.py (PLR0911)
+      - apps/ai_services/mcp/tool_implementations/session_resume.py (PLR0915)
+      - apps/ai_services/mcp/tool_implementations/smart_context.py (PLR0912)
+      - apps/ai_services/pydantic_models/context.py (PLR0912)
+      - apps/ai_services/services/prompt_builder.py (PLR0915)
+    approach: |
+      - PLR0911 (too many returns): Extract early returns to validation helper
+      - PLR0912 (too many branches): Use dict dispatch pattern instead of if/elif
+      - PLR0915 (too many statements): Break function into smaller functions
+
+  5_verify_fixes:
+    description: "Run all quality checks"
+    commands:
+      - "ruff check ."
+      - "ruff format --check ."
+      - "pytest -m 'not integration'"
+      - "python manage.py check"
+      - "python manage.py makemigrations --check --dry-run"
+    expected_result: "All checks pass with 0 errors"
+
+  6_commit_and_test_cicd:
+    description: "Commit fixes and verify CI/CD passes"
+    commands:
+      - "git add -A"
+      - "git commit -m 'fix(lint): resolve all ruff linting errors'"
+      - "git push origin dev"
+      - "gh run watch"
+    expected_result: "CI/CD linting job passes"
+
+# ============================================================================
+# Testing Requirements
+# ============================================================================
+testing:
+  unit_tests:
+    - "Verify all existing tests still pass"
+    - "pytest -m 'not integration' --cov=apps"
+
+  migration_tests:
+    - "python manage.py migrate --check (test migrations are valid)"
+    - "python manage.py showmigrations (verify migration order)"
+
+  integration_tests:
+    - "Manual test: Create new model instances with empty strings"
+    - "Verify admin interface displays __str__ correctly"
+
+# ============================================================================
+# Risk Assessment
+# ============================================================================
+risks:
+  database_migrations:
+    risk: "Migrations may fail if existing NULL values in database"
+    mitigation: "Use migrations.RunPython to convert NULL to empty string before altering column"
+    example: |
+      # Migration
+      def convert_nulls_to_empty(apps, schema_editor):
+          Model = apps.get_model('app', 'Model')
+          Model.objects.filter(field__isnull=True).update(field='')
+
+  code_refactoring:
+    risk: "Breaking existing functionality when reducing complexity"
+    mitigation: "Run full test suite after each file change"
+
+  time_estimate:
+    risk: "May take longer than 3 hours if complexity is high"
+    mitigation: "Fix DJ001 and DJ008 first (quick wins), tackle PLR rules last"
+
+# ============================================================================
+# Success Metrics
+# ============================================================================
+success_metrics:
+  - "ruff check . returns 0 errors"
+  - "CI/CD linting job shows ✓ passed"
+  - "All tests pass (no regressions)"
+  - "Code coverage remains >= 80%"
+  - "GitHub Actions build completes successfully"
+  - "Docker image builds and pushes to ECR"
+
+# ============================================================================
+# Dependencies
+# ============================================================================
+dependencies:
+  - "Pre-commit hooks installed (.pre-commit-config.yaml exists)"
+  - "pyproject.toml has valid ruff configuration"
+  - "Development environment has ruff==0.11.2 installed"
+
+# ============================================================================
+# Related Tasks
+# ============================================================================
+related_tasks:
+  - "ONBOARDING.md updated with AWS profile requirement"
+  - "pyproject.toml fixed (invalid flake8-django config removed)"
+  - "Pre-commit hooks configured"
+
+# ============================================================================
+# Notes for Next Session
+# ============================================================================
+notes: |
+  - Pre-commit infrastructure is NOW in place (.pre-commit-config.yaml created)
+  - Requirements updated (pre-commit>=3.5.0 added)
+  - This task is ONLY about fixing the existing linting errors
+  - DO NOT circumvent linting rules - FIX the actual issues
+  - Start with DJ001 (most common, easiest to fix systematically)
+  - Use migrations for database schema changes
+  - Test each category of fixes independently before moving to next

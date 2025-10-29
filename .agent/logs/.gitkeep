@@ -1,0 +1,3 @@
+# Log directory for Notion sync
+# Logs are named: sync-YYYY-MM-DD.log
+# Automatically rotated (30 day retention)

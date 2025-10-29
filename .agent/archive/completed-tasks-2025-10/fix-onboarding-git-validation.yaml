@@ -1,0 +1,160 @@
+# Task Definition: Fix Onboarding Git Validation for Multi-Repo Workspace
+# Version: 1.0.0
+# Created: 2025-10-26
+
+task_id: "LW-ONBOARD-GIT-001"
+title: "Fix Onboarding Git Validation for Multi-Repo Workspace"
+status: "not_started"
+priority: "P1"
+assigned_agent: "v_senior_developer"
+estimated_hours: 2
+
+overview: |
+  The `.claude/ONBOARDING.md` checklist assumes a single git repository, but the
+  lightwave workspace contains multiple independent git repositories. This causes
+  git commands to fail when run from the workspace root, blocking proper onboarding
+  validation.
+
+service_owner: ".claude/ONBOARDING.md"
+affects:
+  - "Claude Code session startup workflow"
+  - "Context validation reporting"
+  - "All agents using onboarding checklist"
+
+blocking_tasks: []
+blocked_by_tasks: []
+related_files:
+  - ".claude/ONBOARDING.md"
+  - ".claude/skills/onboarding.md"
+  - ".claude/skills/SESSION_START_PROMPT_V2.md"
+  - "CLAUDE.md (root workspace SOP)"
+
+acceptance_criteria:
+  - criterion: "Onboarding checklist detects multi-repo workspace structure"
+    testable: true
+    test_type: "manual"
+    verification: "Run onboarding from workspace root, no git errors"
+
+  - criterion: "Checklist asks user which repo they're working in BEFORE running git commands"
+    testable: true
+    test_type: "manual"
+    verification: "Onboarding prompts for repo selection in Step 2"
+
+  - criterion: "Git commands run in user-specified repo directory"
+    testable: true
+    test_type: "manual"
+    verification: "git branch/status succeed after repo selection"
+
+  - criterion: "Validation report shows correct git status per repo"
+    testable: true
+    test_type: "manual"
+    verification: "Report includes actual branch names and uncommitted changes"
+
+  - criterion: "Onboarding handles 'just exploring' case without requiring repo selection"
+    testable: true
+    test_type: "manual"
+    verification: "User can skip repo selection if not working on specific task"
+
+  - criterion: "SESSION_START_PROMPT_V2.md updated with correct workflow"
+    testable: true
+    test_type: "manual"
+    verification: "Session start prompt reflects new multi-repo handling"
+
+  - criterion: "Root CLAUDE.md documents multi-repo structure clearly"
+    testable: true
+    test_type: "manual"
+    verification: "Workspace structure section explains git repo locations"
+
+testing:
+  test_types:
+    - type: "manual"
+      description: "Test onboarding from workspace root"
+      steps:
+        - "Start Claude Code session"
+        - "Run onboarding checklist"
+        - "Verify no git errors occur"
+        - "Verify repo selection prompt appears"
+        - "Select Backend/Lightwave-Platform"
+        - "Verify git commands succeed"
+        - "Verify validation report shows correct branch"
+
+    - type: "manual"
+      description: "Test 'just exploring' path"
+      steps:
+        - "Start Claude Code session"
+        - "Run onboarding checklist"
+        - "Select 'just exploring' when asked for repo"
+        - "Verify git validation is skipped gracefully"
+        - "Verify READY status is still achievable"
+
+    - type: "manual"
+      description: "Test with each repo"
+      steps:
+        - "Run onboarding for Backend/Lightwave-Platform"
+        - "Run onboarding for Frontend/lightwave-joelschaeffer"
+        - "Run onboarding for Infrastructure/lightwave-infrastructure"
+        - "Verify all repo-specific CLAUDE.md files load correctly"
+
+checklist:
+  - item: "ONBOARDING.md updated with multi-repo detection"
+    required: true
+
+  - item: "Step 2 moves git commands after repo selection"
+    required: true
+
+  - item: "Validation report template updated with workspace_type field"
+    required: true
+
+  - item: "skills/onboarding.md updated with multi-repo handling"
+    required: true
+
+  - item: "SESSION_START_PROMPT_V2.md updated"
+    required: true
+
+  - item: "Root CLAUDE.md documents workspace structure"
+    required: true
+
+  - item: "Tested onboarding from workspace root - no git errors"
+    required: true
+
+  - item: "Tested 'just exploring' path - graceful skip"
+    required: true
+
+  - item: "Tested with 3+ different repos - all succeed"
+    required: true
+
+  - item: "PR created with changes"
+    required: true
+
+  - item: "Documentation updated in Notion"
+    required: false
+    note: "Optional - these are gitignored files"
+
+metadata_files:
+  - "None - this is a documentation/process fix"
+
+architecture_docs:
+  - ".claude/ONBOARDING.md"
+  - "CLAUDE.md (root)"
+  - ".claude/skills/onboarding.md"
+
+implementation_notes:
+  - "This fixes a hallucination prevention gate that was causing false negatives"
+  - "Multi-repo workspaces are common in monorepo-adjacent structures"
+  - "Onboarding should be resilient to different workspace structures"
+  - "Don't assume single git repo - detect and adapt"
+
+risks:
+  - risk: "Breaking existing onboarding for single-repo projects"
+    mitigation: "Add detection - if single repo, use old workflow"
+
+  - risk: "Users confused by repo selection prompt"
+    mitigation: "Add clear examples and 'just exploring' option"
+
+github_issues: []
+notion_tasks: []
+
+created_date: "2025-10-26"
+updated_date: "2025-10-26"
+version: "1.0.0"
+schema_version: "1.0.0"

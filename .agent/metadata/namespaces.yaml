@@ -1,0 +1,102 @@
+# Namespace Storytelling - LightWave Media
+# Purpose: Every namespace tells a story about WHERE it lives and WHY it exists
+# Synced from: <NOTION_PAGE_URL>
+# Last updated: <YYYY-MM-DD>
+
+version: 1.0.0
+
+# Notion Sync Configuration
+notion_sync:
+  source_database: "Global Documents DB"
+  filters:
+    - field: "Document Type"
+      equals: "Namespace"
+    - field: "Status"
+      equals: "Active"
+    - field: "Agent Tags"
+      contains: "agent:v_senior_developer"
+
+  status_mapping:
+    Active: "Claude Code sees this namespace pattern"
+    Draft: "Hidden (namespace being designed)"
+    Deprecated: "Hidden (no longer use this pattern)"
+
+  sync_frequency: "On task start, or manual trigger"
+  last_synced: "<YYYY-MM-DD HH:MM:SS>"
+
+namespace_strategy:
+  philosophy: |
+    Namespaces are organized by ownership and reusability:
+    - @lightwave/* = Shared across ALL LightWave properties
+    - @<domain>/* = Domain-specific packages (cineos, photographos, etc.)
+    - Naming reveals purpose, dependencies, and architectural layer
+
+  naming_patterns:
+    shared_packages: "@lightwave/<feature|layer>"
+    domain_packages: "@<domain>/<feature>"
+    internal_packages: "@lightwave-internal/<service>"
+
+# Namespace Registry
+# Add each namespace with its story, purpose, and relationships
+
+namespaces:
+  "@lightwave/ui":
+    status: "Active"  # Only Active namespaces appear in this file
+    notion_status: "<Notion Status field value>"
+    story: "<STORY: Why this package exists, what problem it solves>"
+    purpose: "<PURPOSE: What it does in one sentence>"
+    layer: "<frontend|backend|shared|infrastructure>"
+    used_by:
+      - "<domain-1>"
+      - "<domain-2>"
+    depends_on:
+      - "<dependency-1>"
+      - "<dependency-2>"
+    naming_convention: "<Explain naming pattern for exports>"
+    repository: "<GitHub repo path>"
+
+    # Notion metadata
+    notion_id: "<NOTION_PAGE_ID>"
+    notion_url: "<https://notion.so/page-id>"
+    agent_tags:
+      - "agent:v_senior_developer"
+
+  "@lightwave/auth-client":
+    status: "Active"
+    notion_status: "<Notion Status field value>"
+    story: "<STORY>"
+    purpose: "<PURPOSE>"
+    layer: "<LAYER>"
+    used_by: []
+    depends_on: []
+    naming_convention: "<CONVENTION>"
+    repository: "<REPO>"
+
+    # Notion metadata
+    notion_id: "<NOTION_PAGE_ID>"
+    notion_url: "<https://notion.so/page-id>"
+    agent_tags:
+      - "agent:v_senior_developer"
+
+  # Add more namespaces following the same pattern
+  # NOTE: Only namespaces with status="Active" in Notion will sync here
+
+# Namespace Decision Rules
+decision_rules:
+  when_to_create_lightwave_namespace:
+    rule: "<When to use @lightwave/* vs domain-specific>"
+    examples:
+      - condition: "<CONDITION>"
+        decision: "<USE @lightwave/* or @domain/*>"
+
+  when_to_extract_package:
+    rule: "<Rule of Three? Immediate? Never?>"
+    examples:
+      - condition: "<CONDITION>"
+        decision: "<EXTRACT or KEEP IN REPO>"
+
+# Cross-reference to related docs
+related:
+  tech_stack: ".agent/metadata/tech_stack.yaml"
+  package_list: ".agent/metadata/packages.json"
+  architecture: ".agent/metadata/frontend_architecture.yaml"

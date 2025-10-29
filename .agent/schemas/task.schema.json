@@ -1,0 +1,263 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://lightwave-media.ltd/schemas/task.schema.json",
+  "title": "LightWave Task Definition",
+  "description": "Schema for task definition YAML files in .agent/tasks/",
+  "type": "object",
+  "required": [
+    "task_id",
+    "title",
+    "epic_url",
+    "status",
+    "priority",
+    "assigned_agent",
+    "estimated_hours",
+    "service_owner",
+    "acceptance_criteria",
+    "testing",
+    "checklist"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^LW-[A-Z]+-[0-9]+$",
+      "description": "Unique task identifier (e.g., LW-AUTH-CLIENT-001)"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 100,
+      "description": "Concise task title"
+    },
+    "epic_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Notion epic URL"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "not_started",
+        "in_progress",
+        "blocked",
+        "code_review",
+        "testing",
+        "done"
+      ],
+      "description": "Current task status"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["P0", "P1", "P2", "P3"],
+      "description": "Task priority (P0 = highest)"
+    },
+    "assigned_agent": {
+      "type": "string",
+      "enum": [
+        "v_senior_developer",
+        "v_product_architect",
+        "v_scrum_manager",
+        "v_write",
+        "v_core"
+      ],
+      "description": "Agent responsible for this task"
+    },
+    "estimated_hours": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 40,
+      "description": "Estimated hours to complete"
+    },
+    "service_owner": {
+      "type": "string",
+      "description": "Path to owning service/package (e.g., Backend/Lightwave-Platform/backend)"
+    },
+    "deployment_target": {
+      "type": "string",
+      "description": "Where this will be deployed (e.g., npm registry, Cloudflare Pages)"
+    },
+    "consumers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of packages/services that will consume this"
+    },
+    "blocking_tasks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^LW-[A-Z]+-[0-9]+$"
+      },
+      "description": "Tasks that this task blocks"
+    },
+    "blocked_by_tasks": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^LW-[A-Z]+-[0-9]+$"
+      },
+      "description": "Tasks that block this task"
+    },
+    "related_packages": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Related packages/dependencies"
+    },
+    "acceptance_criteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["criterion", "testable"],
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "minLength": 10,
+            "description": "Specific, measurable acceptance criterion"
+          },
+          "testable": {
+            "type": "boolean",
+            "description": "Can this be verified via automated test?"
+          },
+          "test_type": {
+            "type": "string",
+            "enum": ["unit", "integration", "e2e", "coverage", "build"],
+            "description": "Type of test (if testable=true)"
+          },
+          "test_file": {
+            "type": "string",
+            "description": "Path to test file (if testable=true)"
+          },
+          "test_command": {
+            "type": "string",
+            "description": "Command to run test (if testable=true)"
+          },
+          "verification": {
+            "type": "string",
+            "description": "How to verify (if testable=false)"
+          }
+        }
+      }
+    },
+    "testing": {
+      "type": "object",
+      "required": ["coverage_requirement", "test_types", "test_files"],
+      "properties": {
+        "coverage_requirement": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Required test coverage percentage (typically 100)"
+        },
+        "test_types": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["type", "description", "examples"],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["unit", "integration", "e2e", "security", "performance", "visual"]
+              },
+              "description": {
+                "type": "string"
+              },
+              "examples": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "test_files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["path", "purpose"],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "checklist": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["item", "required"],
+        "properties": {
+          "item": {
+            "type": "string",
+            "minLength": 5
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "sop_file": {
+      "type": "string",
+      "pattern": "^\\.agent/sops/.*\\.md$",
+      "description": "Path to related SOP file"
+    },
+    "sop_sections": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Relevant sections in the SOP"
+    },
+    "metadata_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Related metadata files for context"
+    },
+    "architecture_docs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Related architecture documentation"
+    },
+    "created_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date task was created (YYYY-MM-DD)"
+    },
+    "updated_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date task was last updated (YYYY-MM-DD)"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Task definition version (semantic versioning)"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Schema version this task uses"
+    }
+  }
+}

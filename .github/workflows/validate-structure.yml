@@ -1,0 +1,392 @@
+name: Validate Naming Conventions
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feature/**'
+      - 'fix/**'
+      - 'hotfix/**'
+
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  NAMING_CONVENTIONS_FILE: .agent/metadata/naming_conventions.yaml
+
+jobs:
+  validate-naming-conventions:
+    name: Validate Repository Structure
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install pyyaml
+
+      - name: Create validation script
+        run: |
+          cat > validate_structure.py << 'EOF'
+          #!/usr/bin/env python3
+          """
+          Validate repository structure against naming conventions.
+
+          This script checks:
+          - Repository names follow kebab-case
+          - Directory names follow kebab-case
+          - Python files follow snake_case
+          - Python classes follow PascalCase
+          """
+
+          import os
+          import re
+          import sys
+          import yaml
+          from pathlib import Path
+          from typing import List, Dict, Tuple
+
+
+          class ValidationError:
+              """Represents a naming convention violation."""
+
+              def __init__(self, severity: str, file_path: str, message: str, rule: str):
+                  self.severity = severity  # 'error' or 'warning'
+                  self.file_path = file_path
+                  self.message = message
+                  self.rule = rule
+
+              def __str__(self) -> str:
+                  icon = "❌" if self.severity == "error" else "⚠️"
+                  return f"{icon} {self.severity.upper()}: {self.file_path}\n   {self.message}\n   Rule: {self.rule}"
+
+
+          class NamingConventionValidator:
+              """Validates file and directory names against naming conventions."""
+
+              # Regex patterns for case validation
+              KEBAB_CASE_PATTERN = re.compile(r'^[a-z0-9]+(-[a-z0-9]+)*$')
+              SNAKE_CASE_PATTERN = re.compile(r'^[a-z0-9]+(_[a-z0-9]+)*$')
+              PASCAL_CASE_PATTERN = re.compile(r'^[A-Z][a-zA-Z0-9]*$')
+
+              # Directories and files to ignore
+              IGNORED_DIRS = {
+                  '.git', '__pycache__', 'node_modules', '.venv', 'venv',
+                  '.pytest_cache', '.mypy_cache', '.tox', 'dist', 'build',
+                  '.egg-info', '.eggs', 'htmlcov', '.coverage'
+              }
+
+              IGNORED_FILES = {
+                  '.gitignore', '.gitattributes', '.dockerignore', '.editorconfig',
+                  'Dockerfile', 'Makefile', 'LICENSE', 'CHANGELOG.md', 'README.md',
+                  'CLAUDE.md', 'NAMING_CONVENTIONS.md', 'CONTRIBUTING.md'
+              }
+
+              def __init__(self, root_dir: str = '.', naming_conventions_file: str = None):
+                  self.root_dir = Path(root_dir)
+                  self.errors: List[ValidationError] = []
+                  self.warnings: List[ValidationError] = []
+
+                  # Load naming conventions if file exists
+                  if naming_conventions_file and Path(naming_conventions_file).exists():
+                      with open(naming_conventions_file, 'r') as f:
+                          self.conventions = yaml.safe_load(f)
+                  else:
+                      self.conventions = {}
+
+              def should_ignore_path(self, path: Path) -> bool:
+                  """Check if path should be ignored."""
+                  # Ignore hidden directories/files (except .github, .agent, .claude)
+                  if path.name.startswith('.') and path.name not in {'.github', '.agent', '.claude'}:
+                      return True
+
+                  # Check if any parent is in ignored directories
+                  for parent in path.parents:
+                      if parent.name in self.IGNORED_DIRS:
+                          return True
+
+                  # Check if file is in ignored files
+                  if path.is_file() and path.name in self.IGNORED_FILES:
+                      return True
+
+                  return False
+
+              def validate_kebab_case(self, name: str) -> bool:
+                  """Validate that name follows kebab-case."""
+                  return bool(self.KEBAB_CASE_PATTERN.match(name))
+
+              def validate_snake_case(self, name: str) -> bool:
+                  """Validate that name follows snake_case."""
+                  return bool(self.SNAKE_CASE_PATTERN.match(name))
+
+              def validate_pascal_case(self, name: str) -> bool:
+                  """Validate that name follows PascalCase."""
+                  return bool(self.PASCAL_CASE_PATTERN.match(name))
+
+              def validate_directory_name(self, dir_path: Path) -> None:
+                  """Validate directory follows kebab-case."""
+                  if self.should_ignore_path(dir_path):
+                      return
+
+                  # Special case: root level directories can use PascalCase (Backend, Frontend, Infrastructure)
+                  is_root_level = dir_path.parent == self.root_dir
+                  if is_root_level and self.validate_pascal_case(dir_path.name):
+                      return
+
+                  # Otherwise, must be kebab-case
+                  if not self.validate_kebab_case(dir_path.name):
+                      self.errors.append(ValidationError(
+                          severity='error',
+                          file_path=str(dir_path.relative_to(self.root_dir)),
+                          message=f"Directory name '{dir_path.name}' must use kebab-case",
+                          rule='directory names must use kebab-case (lowercase-with-hyphens)'
+                      ))
+
+              def validate_python_file_name(self, file_path: Path) -> None:
+                  """Validate Python file follows snake_case."""
+                  if self.should_ignore_path(file_path):
+                      return
+
+                  # Get filename without extension
+                  name = file_path.stem
+
+                  # Check if it follows snake_case
+                  if not self.validate_snake_case(name):
+                      self.errors.append(ValidationError(
+                          severity='error',
+                          file_path=str(file_path.relative_to(self.root_dir)),
+                          message=f"Python file '{file_path.name}' must use snake_case",
+                          rule='Python files must use snake_case (lowercase_with_underscores.py)'
+                      ))
+
+              def validate_python_class_names(self, file_path: Path) -> None:
+                  """Validate Python class names follow PascalCase."""
+                  if self.should_ignore_path(file_path):
+                      return
+
+                  try:
+                      with open(file_path, 'r', encoding='utf-8') as f:
+                          content = f.read()
+                  except Exception:
+                      # Skip files that can't be read
+                      return
+
+                  # Find class definitions
+                  class_pattern = re.compile(r'^class\s+([A-Za-z_][A-Za-z0-9_]*)', re.MULTILINE)
+
+                  for match in class_pattern.finditer(content):
+                      class_name = match.group(1)
+                      line_number = content[:match.start()].count('\n') + 1
+
+                      if not self.validate_pascal_case(class_name):
+                          self.errors.append(ValidationError(
+                              severity='error',
+                              file_path=f"{file_path.relative_to(self.root_dir)}:{line_number}",
+                              message=f"Class name '{class_name}' must use PascalCase",
+                              rule='Python class names must use PascalCase (UpperCamelCase)'
+                          ))
+
+              def validate_typescript_file_name(self, file_path: Path) -> None:
+                  """Validate TypeScript/JavaScript file naming conventions."""
+                  if self.should_ignore_path(file_path):
+                      return
+
+                  name = file_path.stem
+
+                  # Component files should be PascalCase
+                  if file_path.suffix in {'.tsx'}:
+                      if not self.validate_pascal_case(name):
+                          self.errors.append(ValidationError(
+                              severity='error',
+                              file_path=str(file_path.relative_to(self.root_dir)),
+                              message=f"React component file '{file_path.name}' must use PascalCase",
+                              rule='React component files must use PascalCase (ComponentName.tsx)'
+                          ))
+
+                  # Utility files should be camelCase or kebab-case
+                  elif file_path.suffix in {'.ts', '.js'}:
+                      # Allow both camelCase and kebab-case for utility files
+                      if not (self.validate_snake_case(name.replace('-', '_')) or
+                              name[0].islower()):
+                          self.warnings.append(ValidationError(
+                              severity='warning',
+                              file_path=str(file_path.relative_to(self.root_dir)),
+                              message=f"TypeScript/JavaScript file '{file_path.name}' should use camelCase or kebab-case",
+                              rule='TS/JS utility files should use camelCase or kebab-case'
+                          ))
+
+              def run_validation(self) -> Tuple[int, int]:
+                  """Run all validations and return (error_count, warning_count)."""
+                  print("🔍 Starting naming convention validation...")
+                  print(f"Root directory: {self.root_dir.resolve()}")
+                  print("")
+
+                  # Walk through all files and directories
+                  for path in self.root_dir.rglob('*'):
+                      # Validate directories
+                      if path.is_dir():
+                          self.validate_directory_name(path)
+
+                      # Validate Python files
+                      elif path.suffix == '.py':
+                          self.validate_python_file_name(path)
+                          self.validate_python_class_names(path)
+
+                      # Validate TypeScript/JavaScript files
+                      elif path.suffix in {'.ts', '.tsx', '.js', '.jsx'}:
+                          self.validate_typescript_file_name(path)
+
+                  # Print results
+                  error_count = len(self.errors)
+                  warning_count = len(self.warnings)
+
+                  if self.errors:
+                      print("=" * 80)
+                      print("ERRORS:")
+                      print("=" * 80)
+                      for error in self.errors:
+                          print(error)
+                          print()
+
+                  if self.warnings:
+                      print("=" * 80)
+                      print("WARNINGS:")
+                      print("=" * 80)
+                      for warning in self.warnings:
+                          print(warning)
+                          print()
+
+                  print("=" * 80)
+                  print("SUMMARY:")
+                  print("=" * 80)
+                  print(f"✅ Validation complete")
+                  print(f"❌ Errors: {error_count}")
+                  print(f"⚠️  Warnings: {warning_count}")
+
+                  return error_count, warning_count
+
+
+          def main():
+              """Main entry point."""
+              naming_conventions_file = os.getenv('NAMING_CONVENTIONS_FILE')
+
+              validator = NamingConventionValidator(
+                  root_dir='.',
+                  naming_conventions_file=naming_conventions_file
+              )
+
+              error_count, warning_count = validator.run_validation()
+
+              # Exit with error if any errors were found
+              if error_count > 0:
+                  print("")
+                  print("❌ Validation failed: Found naming convention violations")
+                  sys.exit(1)
+
+              print("")
+              print("✅ All naming conventions validated successfully")
+              sys.exit(0)
+
+
+          if __name__ == '__main__':
+              main()
+          EOF
+
+          chmod +x validate_structure.py
+
+      - name: Run validation
+        id: validate
+        run: |
+          python validate_structure.py 2>&1 | tee validation_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+
+      - name: Generate validation summary
+        if: always()
+        run: |
+          echo "# 🔍 Naming Convention Validation" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.validate.outputs.exit_code }}" == "0" ]; then
+            echo "## ✅ Validation Passed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All files and directories follow the naming conventions." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Validation Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The following naming convention violations were found:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Errors" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            grep "ERROR:" validation_output.txt || echo "No errors" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Naming Convention Rules" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repositories/Directories:** \`kebab-case\` (lowercase-with-hyphens)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python Files:** \`snake_case\` (lowercase_with_underscores.py)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python Classes:** \`PascalCase\` (UpperCamelCase)" >> $GITHUB_STEP_SUMMARY
+          echo "- **React Components:** \`PascalCase\` (ComponentName.tsx)" >> $GITHUB_STEP_SUMMARY
+          echo "- **TypeScript/JavaScript:** \`camelCase\` or \`kebab-case\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📖 Full conventions: [\`.agent/metadata/naming_conventions.yaml\`](.agent/metadata/naming_conventions.yaml)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Annotate PR with violations
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const output = fs.readFileSync('validation_output.txt', 'utf8');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## ❌ Naming Convention Validation Failed
+
+              The following naming convention violations were found:
+
+              \`\`\`
+              ${output}
+              \`\`\`
+
+              ### Naming Convention Rules
+
+              - **Repositories/Directories:** \`kebab-case\` (lowercase-with-hyphens)
+              - **Python Files:** \`snake_case\` (lowercase_with_underscores.py)
+              - **Python Classes:** \`PascalCase\` (UpperCamelCase)
+              - **React Components:** \`PascalCase\` (ComponentName.tsx)
+              - **TypeScript/JavaScript:** \`camelCase\` or \`kebab-case\`
+
+              📖 Full conventions: [\`.agent/metadata/naming_conventions.yaml\`](.agent/metadata/naming_conventions.yaml)
+
+              Please fix these violations and push again.`
+            });
+
+      - name: Fail workflow if validation failed
+        if: steps.validate.outputs.exit_code != '0'
+        run: |
+          echo "❌ Naming convention validation failed"
+          exit 1

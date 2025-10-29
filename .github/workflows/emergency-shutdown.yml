@@ -1,0 +1,307 @@
+name: Emergency Shutdown - AWS Kill Switch
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to shut down'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      confirmation:
+        description: 'Type the environment name again to confirm'
+        required: true
+        type: string
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: '738605694078'
+
+jobs:
+  validate-confirmation:
+    name: Validate Shutdown Confirmation
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      confirmed: ${{ steps.check.outputs.confirmed }}
+
+    steps:
+      - name: Validate confirmation matches environment
+        id: check
+        run: |
+          if [ "${{ github.event.inputs.environment }}" != "${{ github.event.inputs.confirmation }}" ]; then
+            echo "::error::Confirmation does not match environment. You entered '${{ github.event.inputs.confirmation }}' but selected '${{ github.event.inputs.environment }}'"
+            exit 1
+          fi
+          echo "confirmed=true" >> $GITHUB_OUTPUT
+          echo "✅ Confirmation validated for environment: ${{ github.event.inputs.environment }}"
+
+  emergency-shutdown:
+    name: Execute Emergency Shutdown - ${{ github.event.inputs.environment }}
+    runs-on: ubuntu-latest
+    needs: validate-confirmation
+    timeout-minutes: 5
+    environment: ${{ github.event.inputs.environment }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: false
+
+      - name: Verify AWS account
+        run: |
+          CURRENT_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          if [ "$CURRENT_ACCOUNT" != "${{ env.AWS_ACCOUNT_ID }}" ]; then
+            echo "::error::AWS account mismatch. Expected ${{ env.AWS_ACCOUNT_ID }}, got $CURRENT_ACCOUNT"
+            exit 1
+          fi
+          echo "✅ AWS account verified: $CURRENT_ACCOUNT"
+
+      - name: Stop all ECS tasks
+        id: stop-ecs-tasks
+        run: |
+          echo "🛑 Stopping all ECS tasks in ${{ github.event.inputs.environment }}..."
+
+          # Get all clusters
+          CLUSTERS=$(aws ecs list-clusters --query 'clusterArns[]' --output text)
+
+          if [ -z "$CLUSTERS" ]; then
+            echo "ℹ️ No ECS clusters found"
+            exit 0
+          fi
+
+          TOTAL_TASKS_STOPPED=0
+
+          for CLUSTER in $CLUSTERS; do
+            CLUSTER_NAME=$(echo $CLUSTER | awk -F'/' '{print $NF}')
+
+            # Skip clusters not matching the environment
+            if [[ ! "$CLUSTER_NAME" =~ ${{ github.event.inputs.environment }} ]]; then
+              echo "⏭️ Skipping cluster $CLUSTER_NAME (does not match environment)"
+              continue
+            fi
+
+            echo "Processing cluster: $CLUSTER_NAME"
+
+            # Get all running tasks in the cluster
+            TASK_ARNS=$(aws ecs list-tasks \
+              --cluster "$CLUSTER" \
+              --desired-status RUNNING \
+              --query 'taskArns[]' \
+              --output text)
+
+            if [ -z "$TASK_ARNS" ]; then
+              echo "  ℹ️ No running tasks in cluster $CLUSTER_NAME"
+              continue
+            fi
+
+            # Stop each task
+            for TASK_ARN in $TASK_ARNS; do
+              echo "  Stopping task: $TASK_ARN"
+              aws ecs stop-task \
+                --cluster "$CLUSTER" \
+                --task "$TASK_ARN" \
+                --reason "Emergency shutdown triggered via GitHub Actions" \
+                --no-cli-pager
+              TOTAL_TASKS_STOPPED=$((TOTAL_TASKS_STOPPED + 1))
+            done
+          done
+
+          echo "tasks_stopped=$TOTAL_TASKS_STOPPED" >> $GITHUB_OUTPUT
+          echo "✅ Stopped $TOTAL_TASKS_STOPPED ECS tasks"
+
+      - name: Set ECS service desired count to 0
+        id: scale-ecs-services
+        run: |
+          echo "📉 Setting ECS service desired count to 0..."
+
+          CLUSTERS=$(aws ecs list-clusters --query 'clusterArns[]' --output text)
+
+          if [ -z "$CLUSTERS" ]; then
+            echo "ℹ️ No ECS clusters found"
+            exit 0
+          fi
+
+          TOTAL_SERVICES_SCALED=0
+
+          for CLUSTER in $CLUSTERS; do
+            CLUSTER_NAME=$(echo $CLUSTER | awk -F'/' '{print $NF}')
+
+            # Skip clusters not matching the environment
+            if [[ ! "$CLUSTER_NAME" =~ ${{ github.event.inputs.environment }} ]]; then
+              continue
+            fi
+
+            echo "Processing cluster: $CLUSTER_NAME"
+
+            # Get all services in the cluster
+            SERVICE_ARNS=$(aws ecs list-services \
+              --cluster "$CLUSTER" \
+              --query 'serviceArns[]' \
+              --output text)
+
+            if [ -z "$SERVICE_ARNS" ]; then
+              echo "  ℹ️ No services in cluster $CLUSTER_NAME"
+              continue
+            fi
+
+            # Scale down each service
+            for SERVICE_ARN in $SERVICE_ARNS; do
+              SERVICE_NAME=$(echo $SERVICE_ARN | awk -F'/' '{print $NF}')
+              echo "  Scaling down service: $SERVICE_NAME"
+
+              aws ecs update-service \
+                --cluster "$CLUSTER" \
+                --service "$SERVICE_ARN" \
+                --desired-count 0 \
+                --no-cli-pager
+
+              TOTAL_SERVICES_SCALED=$((TOTAL_SERVICES_SCALED + 1))
+            done
+          done
+
+          echo "services_scaled=$TOTAL_SERVICES_SCALED" >> $GITHUB_OUTPUT
+          echo "✅ Scaled down $TOTAL_SERVICES_SCALED ECS services to 0"
+
+      - name: Stop RDS instances
+        id: stop-rds
+        run: |
+          echo "🛑 Stopping RDS instances..."
+
+          # Get all RDS instances
+          DB_INSTANCES=$(aws rds describe-db-instances \
+            --query 'DBInstances[?DBInstanceStatus==`available`].DBInstanceIdentifier' \
+            --output text)
+
+          if [ -z "$DB_INSTANCES" ]; then
+            echo "ℹ️ No available RDS instances found"
+            exit 0
+          fi
+
+          TOTAL_DBS_STOPPED=0
+
+          for DB_INSTANCE in $DB_INSTANCES; do
+            # Skip instances not matching the environment
+            if [[ ! "$DB_INSTANCE" =~ ${{ github.event.inputs.environment }} ]]; then
+              echo "⏭️ Skipping RDS instance $DB_INSTANCE (does not match environment)"
+              continue
+            fi
+
+            echo "Stopping RDS instance: $DB_INSTANCE"
+
+            aws rds stop-db-instance \
+              --db-instance-identifier "$DB_INSTANCE" \
+              --no-cli-pager || echo "  ⚠️ Could not stop $DB_INSTANCE (may not support stopping)"
+
+            TOTAL_DBS_STOPPED=$((TOTAL_DBS_STOPPED + 1))
+          done
+
+          echo "databases_stopped=$TOTAL_DBS_STOPPED" >> $GITHUB_OUTPUT
+          echo "✅ Stopped $TOTAL_DBS_STOPPED RDS instances"
+
+      - name: Stop ElastiCache clusters
+        id: stop-elasticache
+        run: |
+          echo "🛑 Stopping ElastiCache clusters..."
+
+          # Get all Redis replication groups
+          REDIS_GROUPS=$(aws elasticache describe-replication-groups \
+            --query 'ReplicationGroups[?Status==`available`].ReplicationGroupId' \
+            --output text)
+
+          # Get all Memcached clusters
+          MEMCACHED_CLUSTERS=$(aws elasticache describe-cache-clusters \
+            --query 'CacheClusters[?CacheClusterStatus==`available` && Engine==`memcached`].CacheClusterId' \
+            --output text)
+
+          TOTAL_CACHE_DELETED=0
+
+          # Delete Redis replication groups
+          if [ -n "$REDIS_GROUPS" ]; then
+            for GROUP in $REDIS_GROUPS; do
+              # Skip groups not matching the environment
+              if [[ ! "$GROUP" =~ ${{ github.event.inputs.environment }} ]]; then
+                echo "⏭️ Skipping Redis group $GROUP (does not match environment)"
+                continue
+              fi
+
+              echo "Deleting Redis replication group: $GROUP"
+
+              aws elasticache delete-replication-group \
+                --replication-group-id "$GROUP" \
+                --no-retain-primary-cluster \
+                --no-cli-pager
+
+              TOTAL_CACHE_DELETED=$((TOTAL_CACHE_DELETED + 1))
+            done
+          fi
+
+          # Delete Memcached clusters
+          if [ -n "$MEMCACHED_CLUSTERS" ]; then
+            for CLUSTER in $MEMCACHED_CLUSTERS; do
+              # Skip clusters not matching the environment
+              if [[ ! "$CLUSTER" =~ ${{ github.event.inputs.environment }} ]]; then
+                echo "⏭️ Skipping Memcached cluster $CLUSTER (does not match environment)"
+                continue
+              fi
+
+              echo "Deleting Memcached cluster: $CLUSTER"
+
+              aws elasticache delete-cache-cluster \
+                --cache-cluster-id "$CLUSTER" \
+                --no-cli-pager
+
+              TOTAL_CACHE_DELETED=$((TOTAL_CACHE_DELETED + 1))
+            done
+          fi
+
+          if [ $TOTAL_CACHE_DELETED -eq 0 ]; then
+            echo "ℹ️ No ElastiCache clusters found to delete"
+          else
+            echo "✅ Deleted $TOTAL_CACHE_DELETED ElastiCache clusters"
+          fi
+
+          echo "cache_clusters_deleted=$TOTAL_CACHE_DELETED" >> $GITHUB_OUTPUT
+
+      - name: Generate shutdown summary
+        run: |
+          echo "# 🚨 Emergency Shutdown Summary - ${{ github.event.inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** @${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** \`${{ github.event.inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**AWS Account:** \`${{ env.AWS_ACCOUNT_ID }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Region:** \`${{ env.AWS_REGION }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Resources Stopped" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource Type | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| ECS Tasks | ${{ steps.stop-ecs-tasks.outputs.tasks_stopped }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ECS Services | ${{ steps.scale-ecs-services.outputs.services_scaled }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| RDS Instances | ${{ steps.stop-rds.outputs.databases_stopped }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ElastiCache Clusters | ${{ steps.stop-elasticache.outputs.cache_clusters_deleted }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review AWS console to verify all resources are stopped" >> $GITHUB_STEP_SUMMARY
+          echo "2. Check billing dashboard for cost impact" >> $GITHUB_STEP_SUMMARY
+          echo "3. To restart services, manually scale ECS services and start RDS instances" >> $GITHUB_STEP_SUMMARY
+          echo "4. ElastiCache clusters were deleted and will need to be recreated via Terraform" >> $GITHUB_STEP_SUMMARY
+
+      - name: Send notification
+        if: always()
+        run: |
+          echo "📢 Emergency shutdown workflow completed"
+          echo "Status: ${{ job.status }}"
+          echo "Review the summary for detailed information"

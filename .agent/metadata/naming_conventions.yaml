@@ -1,0 +1,1301 @@
+# LightWave Media Ecosystem - Naming Conventions (Programmatic Reference)
+# Version: 2.0.0
+# Last Updated: 2025-10-28
+# Source: LWM EcoSystem - Naming Conventions & Directory Structures - v1.0.0.md
+# SSOT Reference for: software-architect, api-architect, zen-code-generator, codebase-structure-auditor
+
+# =============================================================================
+# TEMPLATE VARIABLES
+# =============================================================================
+variables:
+  # Organization & Workspace
+  github_org: "lightwave-media"
+  workspace_root: "/Users/joelschaeffer/dev/lightwave-workspace"
+
+  # Domain Identifiers
+  domains:
+    - "lightwave-media"
+    - "joelschaeffer"
+    - "cineos"
+    - "createos"
+    - "photographyos"
+
+  # Deprecated/Legacy References (DO NOT USE)
+  deprecated:
+    old_org: "kiwi-dev-la"
+    old_prefix: "LWM"
+
+  # Directory Structure
+  directory_layout:
+    backend: "Backend/"
+    frontend: "Frontend/"
+    infrastructure: "Infrastructure/"
+
+  # Environment Suffixes
+  environments:
+    development: "dev"
+    staging: "staging"
+    production: "prod"
+
+  # Container Registry
+  container_registry: "ghcr.io"
+
+# =============================================================================
+# CASE STYLE DEFINITIONS
+# =============================================================================
+case_styles:
+  kebab_case:
+    pattern: "all-lowercase-words-with-hyphens"
+    usage:
+      - "Git repository names"
+      - "URLs and slugs"
+      - "Docker image names"
+      - "Kubernetes resource names"
+      - "Directory names"
+      - "API endpoint paths"
+    examples:
+      - "lightwave-backend"
+      - "user-profile"
+      - "api-gateway-config.yaml"
+
+  snake_case:
+    pattern: "all_lowercase_words_with_underscores"
+    usage:
+      - "Python filenames (.py)"
+      - "Python variables"
+      - "Python functions/methods"
+      - "Database table names"
+      - "Database column names"
+      - "API query parameters"
+      - "JSON payload keys"
+    examples:
+      - "user_handlers.py"
+      - "user_count"
+      - "get_user_by_id"
+      - "created_at"
+
+  PascalCase:
+    pattern: "UpperCamelCaseWithCapitalFirstLetter"
+    usage:
+      - "Python class names"
+      - "JavaScript/TypeScript class names"
+      - "React component names"
+      - "TypeScript type names"
+      - "TypeScript interface names"
+    examples:
+      - "UserService"
+      - "ApiGatewayConfig"
+      - "UserProfile"
+
+  camelCase:
+    pattern: "lowerCamelCaseWithLowercaseFirst"
+    usage:
+      - "JavaScript/TypeScript variables"
+      - "JavaScript/TypeScript functions"
+    examples:
+      - "userName"
+      - "fetchUserData"
+      - "handleSubmit"
+
+  UPPER_SNAKE_CASE:
+    pattern: "ALL_UPPERCASE_WORDS_WITH_UNDERSCORES"
+    usage:
+      - "Constants in all languages"
+      - "Environment variables"
+      - "Configuration keys"
+    examples:
+      - "MAX_API_RETRIES"
+      - "DATABASE_URL"
+      - "FEATURE_NEW_UI_ENABLED"
+
+# =============================================================================
+# DECISION TREES
+# =============================================================================
+decision_trees:
+  # Repository Naming Decision Tree
+  repository_naming:
+    base_pattern: "{{github_org}}/lightwave-{{component}}"
+    rules:
+      - condition: "is_frontend_domain_site"
+        pattern: "{{github_org}}/{{domain}}"
+        examples:
+          - "lightwave-media/cineos"
+          - "lightwave-media/joelschaeffer"
+          - "lightwave-media/photographyos"
+
+      - condition: "is_backend_monorepo"
+        pattern: "{{github_org}}/lightwave-backend"
+        placement: "Backend/"
+        examples:
+          - "lightwave-media/lightwave-backend"
+
+      - condition: "is_shared_library"
+        pattern: "{{github_org}}/lightwave-{{library_name}}"
+        examples:
+          - "lightwave-media/lightwave-shared-core"
+          - "lightwave-media/lightwave-cli"
+
+      - condition: "is_infrastructure"
+        pattern: "{{github_org}}/lightwave-infrastructure-{{type}}"
+        placement: "Infrastructure/"
+        examples:
+          - "lightwave-media/lightwave-infrastructure-catalog"
+          - "lightwave-media/lightwave-infrastructure-live"
+
+      - condition: "is_documentation"
+        pattern: "{{github_org}}/lightwave-{{docs_type}}-docs"
+        examples:
+          - "lightwave-media/lightwave-ecosystem-docs"
+
+    validation:
+      case: "kebab-case"
+      prefix_required: true
+      prefix: "lightwave-"
+      max_length: 100
+      allowed_chars: "[a-z0-9-]"
+
+  # Branch Naming Decision Tree
+  branch_naming:
+    protected_branches:
+      - name: "main"
+        description: "Production code. Protected."
+      - name: "develop"
+        description: "Main integration branch."
+
+    patterns:
+      feature:
+        pattern: "feature/{{domain}}/{{task_id}}-{{slug}}"
+        examples:
+          - "feature/auth/us-123-user-registration-flow"
+          - "feature/cineos/task-456-shot-list-api"
+        regex: "^feature/[a-z-]+/(us|task)-[0-9]+-[a-z0-9-]+$"
+
+      fix:
+        pattern: "fix/{{domain}}/{{task_id}}-{{slug}}"
+        examples:
+          - "fix/auth/task-456-token-expiry-error"
+          - "fix/api/bug-789-rate-limit-bypass"
+        regex: "^fix/[a-z-]+/(task|bug)-[0-9]+-[a-z0-9-]+$"
+
+      hotfix:
+        pattern: "hotfix/v{{semver}}-{{slug}}"
+        branch_from: "main"
+        examples:
+          - "hotfix/v1.0.1-critical-login-bug"
+          - "hotfix/v2.3.1-security-patch"
+        regex: "^hotfix/v[0-9]+\\.[0-9]+\\.[0-9]+-[a-z0-9-]+$"
+
+      release:
+        pattern: "release/v{{semver}}"
+        examples:
+          - "release/v1.0.0"
+          - "release/v1.1.0"
+        regex: "^release/v[0-9]+\\.[0-9]+\\.[0-9]+$"
+
+    validation:
+      case: "kebab-case"
+      max_length: 100
+      require_task_id: true
+      task_id_pattern: "(us|task|bug)-[0-9]+"
+
+  # Commit Message Decision Tree
+  commit_message:
+    format: "{{type}}({{scope}}): {{description}}"
+    conventional_commits: true
+
+    types:
+      feat:
+        description: "New feature"
+        examples: ["feat(auth): implement user registration endpoint"]
+      fix:
+        description: "Bug fix"
+        examples: ["fix(api): resolve token expiry error"]
+      build:
+        description: "Build system changes"
+        examples: ["build(deps): upgrade FastAPI to v0.104.0"]
+      chore:
+        description: "Maintenance tasks"
+        examples: ["chore(ci): update GitHub Actions workflow"]
+      ci:
+        description: "CI/CD changes"
+        examples: ["ci(deploy): add staging deployment pipeline"]
+      docs:
+        description: "Documentation changes"
+        examples: ["docs(api): update authentication guide"]
+      perf:
+        description: "Performance improvements"
+        examples: ["perf(db): add index on user email"]
+      refactor:
+        description: "Code refactoring"
+        examples: ["refactor(auth): extract validation logic"]
+      revert:
+        description: "Revert previous commit"
+        examples: ["revert: revert feat(auth): implement user registration"]
+      style:
+        description: "Code style changes"
+        examples: ["style(api): format code with black"]
+      test:
+        description: "Test changes"
+        examples: ["test(auth): add registration endpoint tests"]
+
+    body_format:
+      required_footer: true
+      footer_pattern: "Relates: {{task_id}}"
+      task_id_examples:
+        - "Relates: US-123"
+        - "Fixes: TASK-456"
+        - "Closes: BUG-789"
+
+  # Docker Image Tagging Decision Tree
+  docker_image_tagging:
+    base_pattern: "{{container_registry}}/{{github_org}}/lightwave-{{service}}"
+
+    tag_strategies:
+      semantic_version:
+        patterns:
+          release: "v{{major}}.{{minor}}.{{patch}}"
+          prerelease: "v{{major}}.{{minor}}.{{patch}}-{{stage}}.{{iteration}}"
+          variant: "v{{major}}.{{minor}}.{{patch}}-{{variant}}"
+        examples:
+          - "v1.0.0"
+          - "v1.0.1"
+          - "v1.0.0-beta.1"
+          - "v1.0.0-rc.1"
+          - "v1.0.0-alpine"
+          - "v1.0.0-slim"
+
+      environment_based:
+        patterns:
+          development: "dev-{{git_sha_short}}"
+          staging: "staging-v{{semver}}"
+          staging_date: "staging-{{date}}"
+        examples:
+          - "dev-abc1234"
+          - "staging-v1.0.0"
+          - "staging-20250115"
+        rules:
+          - "Production MUST use semantic version tags"
+          - "Development uses short git SHA"
+          - "Never rely on 'latest' tag in production"
+
+      timestamp_based:
+        patterns:
+          date: "{{YYYY}}-{{MM}}-{{DD}}"
+          datetime: "{{YYYYMMDD}}-{{HHMMSS}}"
+        examples:
+          - "2025-01-15"
+          - "20250115-143052"
+
+      branch_based:
+        patterns:
+          feature: "feature-{{branch_slug}}-{{sha_short}}"
+          pr: "pr-{{number}}"
+        examples:
+          - "feature-user-auth-abc1234"
+          - "pr-123"
+
+      commit_based:
+        patterns:
+          full: "git-{{full_sha}}"
+          short_with_version: "v{{semver}}-{{sha_short}}"
+        examples:
+          - "git-abc123def456"
+          - "v1.0.0-abc1234"
+
+    labels:
+      required:
+        - key: "version"
+          example: "1.0.0"
+        - key: "commit"
+          example: "abc123def456"
+        - key: "build.date"
+          example: "2025-01-15T14:30:52Z"
+        - key: "maintainer"
+          example: "team@lightwave.io"
+
+  # API Endpoint Naming Decision Tree
+  api_endpoint_naming:
+    base_pattern: "/api/v{{major_version}}"
+
+    rules:
+      - condition: "is_resource_collection"
+        pattern: "/api/v{{version}}/{{resource_plural}}"
+        case: "kebab-case"
+        examples:
+          - "/api/v1/users"
+          - "/api/v1/film-projects"
+          - "/api/v1/shot-lists"
+
+      - condition: "is_specific_resource"
+        pattern: "/api/v{{version}}/{{resource_plural}}/{{resource_id}}"
+        examples:
+          - "/api/v1/users/123"
+          - "/api/v1/film-projects/abc-def-456"
+
+      - condition: "is_nested_resource"
+        pattern: "/api/v{{version}}/{{parent_resource}}/{{parent_id}}/{{child_resource}}/{{child_id}}"
+        examples:
+          - "/api/v1/film-projects/123/shot-lists/456"
+          - "/api/v1/users/789/projects/abc"
+
+    query_parameters:
+      case: "snake_case"
+      examples:
+        - "?user_id=123"
+        - "?sort_by=created_at"
+        - "?filter_status=active"
+        - "?page=1&limit=20"
+
+    json_payload_keys:
+      case: "snake_case"
+      examples:
+        request:
+          - '{"user_name": "john", "email_address": "john@example.com"}'
+          - '{"project_name": "Feature Film", "start_date": "2025-01-15"}'
+        response:
+          - '{"user_id": 123, "created_at": "2025-01-15T14:30:52Z"}'
+          - '{"total_count": 42, "items": []}'
+
+  # Python Class/Module Naming Decision Tree
+  python_naming:
+    modules:
+      pattern: "{{module_name}}.py"
+      case: "snake_case"
+      examples:
+        - "user_handlers.py"
+        - "project_service.py"
+        - "auth_middleware.py"
+
+    packages:
+      pattern: "{{package_name}}/"
+      case: "snake_case"
+      requires: "__init__.py"
+      examples:
+        - "api_v1/"
+        - "user_services/"
+        - "auth_handlers/"
+
+    classes:
+      pattern: "{{ClassName}}"
+      case: "PascalCase"
+      examples:
+        - "UserService"
+        - "ApiGatewayConfig"
+        - "ProjectManager"
+
+    exceptions:
+      pattern: "{{Context}}{{Error}}Error"
+      case: "PascalCase"
+      suffix_required: "Error"
+      examples:
+        - "ResourceNotFoundError"
+        - "DatabaseConnectionError"
+        - "ValidationError"
+        - "AuthenticationError"
+
+    functions:
+      pattern: "{{function_name}}"
+      case: "snake_case"
+      examples:
+        - "get_user_by_id"
+        - "calculate_price"
+        - "send_notification_email"
+
+    variables:
+      pattern: "{{variable_name}}"
+      case: "snake_case"
+      examples:
+        - "user_count"
+        - "is_active"
+        - "total_price"
+
+    constants:
+      pattern: "{{CONSTANT_NAME}}"
+      case: "UPPER_SNAKE_CASE"
+      examples:
+        - "MAX_API_RETRIES"
+        - "DEFAULT_PAGE_SIZE"
+        - "DATABASE_TIMEOUT_SECONDS"
+
+  # Django Framework Naming Decision Tree
+  django_naming:
+    app_names:
+      pattern: "{{app_name}}"
+      case: "snake_case"
+      plural: true
+      examples:
+        - "users"
+        - "projects"
+        - "film_projects"
+        - "posts"
+      exceptions:
+        - "core"
+        - "common"
+        - "blog"
+      multitenant_pattern: "{{subdomain}}_{{function}}"
+      multitenant_examples:
+        - "tenant_billing"
+        - "admin_dashboard"
+
+    service_classes:
+      pattern: "{{Entity}}{{Action}}Service"
+      case: "PascalCase"
+      examples:
+        - "UserCreateService"
+        - "ProjectUpdateService"
+        - "OrderProcessService"
+
+    service_functions:
+      pattern: "{{entity}}_{{action}}"
+      case: "snake_case"
+      examples:
+        - "user_create"
+        - "project_archive"
+        - "order_cancel"
+
+    api_classes:
+      pattern: "{{Entity}}{{Action}}Api"
+      case: "PascalCase"
+      examples:
+        - "UserCreateApi"
+        - "ProjectListApi"
+        - "OrderDetailApi"
+
+    model_managers:
+      pattern: "{{Model}}Manager"
+      case: "PascalCase"
+      examples:
+        - "UserManager"
+        - "ProjectManager"
+        - "OrderManager"
+
+    querysets:
+      pattern: "{{Model}}QuerySet"
+      case: "PascalCase"
+      examples:
+        - "UserQuerySet"
+        - "ActiveProjectQuerySet"
+        - "OrderQuerySet"
+
+    forms:
+      pattern: "{{Model}}{{Purpose}}Form"
+      case: "PascalCase"
+      examples:
+        - "UserRegistrationForm"
+        - "ProjectEditForm"
+        - "OrderPaymentForm"
+
+    serializers:
+      pattern: "{{Model}}{{Purpose}}Serializer"
+      case: "PascalCase"
+      examples:
+        - "UserDetailSerializer"
+        - "ProjectListSerializer"
+        - "OrderCreateSerializer"
+
+    url_patterns:
+      case: "snake_case"
+      examples:
+        - "name='user_detail'"
+        - "name='project_list'"
+        - "name='order_create'"
+
+    template_files:
+      case: "snake_case"
+      extension: ".html"
+      examples:
+        - "user_detail.html"
+        - "project_list.html"
+        - "order_confirmation.html"
+
+  # FastAPI Framework Naming Decision Tree
+  fastapi_naming:
+    router_files:
+      pattern: "{{resource}}.py"
+      case: "snake_case"
+      examples:
+        - "users.py"
+        - "projects.py"
+        - "film_projects.py"
+
+    router_instances:
+      pattern: "router = APIRouter()"
+      consistent_naming: true
+
+    service_files:
+      pattern: "{{resource}}_service.py"
+      case: "snake_case"
+      examples:
+        - "user_service.py"
+        - "project_service.py"
+        - "film_project_service.py"
+
+    service_classes:
+      pattern: "{{Resource}}Service"
+      case: "PascalCase"
+      examples:
+        - "UserService"
+        - "ProjectService"
+        - "FilmProjectService"
+
+    service_functions:
+      pattern: "{{action}}_{{resource}}"
+      case: "snake_case"
+      examples:
+        - "create_user"
+        - "get_user_by_email"
+        - "update_project"
+        - "delete_film_project"
+
+    schema_files:
+      pattern: "{{resource}}_schemas.py"
+      case: "snake_case"
+      examples:
+        - "user_schemas.py"
+        - "project_schemas.py"
+
+    request_schemas:
+      pattern: "{{Resource}}{{Action}}Request"
+      case: "PascalCase"
+      examples:
+        - "UserCreateRequest"
+        - "ProjectUpdateRequest"
+        - "FilmProjectArchiveRequest"
+
+    response_schemas:
+      pattern: "{{Resource}}{{Action}}Response"
+      case: "PascalCase"
+      examples:
+        - "UserDetailResponse"
+        - "ProjectListResponse"
+        - "FilmProjectDetailResponse"
+
+    base_schemas:
+      pattern: "{{Resource}}Base"
+      case: "PascalCase"
+      examples:
+        - "UserBase"
+        - "ProjectBase"
+        - "FilmProjectBase"
+
+    database_models:
+      pattern: "{{Resource}}"
+      case: "PascalCase"
+      singular: true
+      examples:
+        - "User"
+        - "Project"
+        - "FilmProject"
+
+    dependency_functions:
+      patterns:
+        getter: "get_{{resource}}"
+        requirement: "require_{{condition}}"
+      examples:
+        - "get_current_user"
+        - "get_database"
+        - "require_admin"
+        - "require_authenticated"
+
+    background_tasks:
+      pattern: "{{action}}_{{resource}}_task"
+      case: "snake_case"
+      examples:
+        - "send_email_task"
+        - "process_upload_task"
+        - "generate_report_task"
+
+  # TypeScript/JavaScript Naming Decision Tree
+  typescript_naming:
+    files:
+      component_files:
+        pattern: "{{ComponentName}}.tsx"
+        case: "PascalCase"
+        examples:
+          - "UserProfile.tsx"
+          - "ProjectCard.tsx"
+          - "ShotListTable.tsx"
+
+      utility_files:
+        pattern: "{{utilityName}}.ts"
+        case: "camelCase"
+        examples:
+          - "formatDate.ts"
+          - "apiClient.ts"
+          - "storageHelpers.ts"
+
+    variables:
+      pattern: "{{variableName}}"
+      case: "camelCase"
+      examples:
+        - "userName"
+        - "isActive"
+        - "projectCount"
+
+    functions:
+      pattern: "{{functionName}}"
+      case: "camelCase"
+      examples:
+        - "fetchUserData"
+        - "handleSubmit"
+        - "calculateTotal"
+
+    classes:
+      pattern: "{{ClassName}}"
+      case: "PascalCase"
+      examples:
+        - "ApiService"
+        - "UserManager"
+        - "ProjectController"
+
+    interfaces:
+      pattern: "I{{InterfaceName}}"
+      case: "PascalCase"
+      prefix: "I"
+      examples:
+        - "IUserProfile"
+        - "IProjectData"
+        - "IApiResponse"
+
+    type_aliases:
+      pattern: "{{TypeName}}"
+      case: "PascalCase"
+      examples:
+        - "OrderStatus"
+        - "UserRole"
+        - "ProjectPhase"
+
+    enums:
+      enum_name:
+        case: "PascalCase"
+        examples:
+          - "HttpStatus"
+          - "UserRole"
+          - "OrderStatus"
+      enum_members:
+        case: "UPPER_SNAKE_CASE"
+        examples:
+          - "OK = 200"
+          - "NOT_FOUND = 404"
+          - "ADMIN = 'admin'"
+
+    constants:
+      pattern: "{{CONSTANT_NAME}}"
+      case: "UPPER_SNAKE_CASE"
+      examples:
+        - "DEFAULT_PAGE_SIZE"
+        - "MAX_UPLOAD_SIZE"
+        - "API_BASE_URL"
+
+# =============================================================================
+# KUBERNETES CONVENTIONS
+# =============================================================================
+kubernetes:
+  manifest_file_naming:
+    pattern: "{{resource_type}}.{{service_name}}.{{environment}}.yaml"
+    examples:
+      - "deployment.auth-service.yaml"
+      - "service.auth-service.yaml"
+      - "configmap.api-gateway.dev.yaml"
+      - "ingress.frontend.prod.yaml"
+
+  resource_naming:
+    pattern: "lightwave-{{service_name}}-{{resource_type_suffix}}"
+    case: "kebab-case"
+    examples:
+      - "lightwave-auth-service-deployment"
+      - "lightwave-api-gateway-svc"
+      - "lightwave-redis-config"
+      - "lightwave-frontend-ingress"
+
+  namespace_naming:
+    pattern: "lightwave-{{environment}}-{{function}}"
+    case: "kebab-case"
+    dns_compliant: true
+    max_length: 63
+    examples:
+      - "lightwave-prod-services"
+      - "lightwave-staging-frontend"
+      - "lightwave-dev-backend"
+
+  standard_labels:
+    required:
+      - key: "app.kubernetes.io/name"
+        description: "Base name of application"
+        examples: ["lightwave-auth-service", "lightwave-api-gateway"]
+
+      - key: "app.kubernetes.io/instance"
+        description: "Unique instance name"
+        examples: ["lightwave-auth-service-prod", "lightwave-api-gateway-staging"]
+
+      - key: "app.kubernetes.io/version"
+        description: "Version of application (matches image tag)"
+        examples: ["1.0.0", "2.3.1", "1.5.0-beta.1"]
+
+      - key: "app.kubernetes.io/component"
+        description: "Type of component"
+        values: ["api", "frontend", "database", "cache", "queue", "worker"]
+        examples: ["api", "frontend", "database"]
+
+      - key: "app.kubernetes.io/part-of"
+        description: "Higher-level application"
+        examples: ["lightwave-ecosystem", "cineos-platform"]
+
+      - key: "app.kubernetes.io/managed-by"
+        description: "Tool managing the operation"
+        values: ["terraform", "helm", "lightwave-cli", "kubectl"]
+        examples: ["terraform", "lightwave-cli"]
+
+      - key: "app.kubernetes.io/created-by"
+        description: "Entity that created the resource"
+        examples: ["lightwave-cli-v1.2.0", "terraform-v1.5.0"]
+
+    recommended:
+      - key: "environment"
+        values: ["dev", "staging", "prod"]
+        examples: ["prod", "staging"]
+
+      - key: "team"
+        examples: ["platform", "frontend", "backend"]
+
+      - key: "cost-center"
+        description: "For billing/chargeback purposes"
+
+  common_annotations:
+    - key: "kubernetes.io/description"
+      description: "Human-readable description"
+
+    - key: "kubernetes.io/documentation"
+      description: "Link to documentation"
+
+    - key: "lightwave.io/owner-email"
+      description: "Contact email for resource owner"
+
+    - key: "lightwave.io/git-commit"
+      description: "Git commit SHA for deployed code"
+
+# =============================================================================
+# INFRASTRUCTURE AS CODE (TERRAFORM/TERRAGRUNT)
+# =============================================================================
+infrastructure:
+  terraform:
+    module_naming:
+      pattern: "terraform-{{provider}}-{{name}}"
+      case: "kebab-case"
+      examples:
+        - "terraform-aws-vpc"
+        - "terraform-linode-lke"
+        - "terraform-google-gke"
+
+    resource_naming:
+      pattern: "this"
+      description: "Use 'this' when module creates single resource of type"
+      examples:
+        - 'resource "aws_instance" "this"'
+        - 'resource "linode_lke_cluster" "this"'
+
+    variable_naming:
+      case: "snake_case"
+      examples:
+        - "instance_type"
+        - "enable_nat_gateway"
+        - "cluster_name"
+        - "database_version"
+
+    output_naming:
+      pattern: "{{name}}_{{type}}_{{attribute}}"
+      case: "snake_case"
+      examples:
+        - "vpc_id"
+        - "alb_dns_name"
+        - "database_endpoint_url"
+        - "cluster_kubeconfig_content"
+
+    file_organization:
+      required_files:
+        - name: "main.tf"
+          description: "Primary resource definitions"
+        - name: "variables.tf"
+          description: "All variable declarations with descriptions"
+        - name: "outputs.tf"
+          description: "All output declarations"
+        - name: "versions.tf"
+          description: "Provider version constraints"
+
+      optional_files:
+        - name: "locals.tf"
+          description: "Local values and computations"
+        - name: "data.tf"
+          description: "Data source definitions"
+        - pattern: "{{resource_type}}.tf"
+          description: "Resource-specific files when > 150 lines"
+          examples:
+            - "iam.tf"
+            - "security_groups.tf"
+            - "load_balancers.tf"
+
+  terragrunt:
+    configuration_files:
+      - name: "terragrunt.hcl"
+        description: "Per-directory Terragrunt config"
+      - name: "env.hcl"
+        description: "Environment-specific variables"
+      - name: "account.hcl"
+        description: "Account-level configuration"
+      - name: "region.hcl"
+        description: "Region-specific settings"
+
+    directory_structure:
+      pattern: "envs/{{environment}}/{{region}}/{{service}}"
+      examples:
+        - "envs/prod/us-east-1/auth-service"
+        - "envs/staging/eu-west-1/api-gateway"
+        - "envs/dev/us-west-2/database"
+
+  testing:
+    required: true
+    framework: "Terratest"
+    test_file_pattern: "test/{{module_name}}_test.go"
+    examples:
+      - "test/vpc_test.go"
+      - "test/lke_cluster_test.go"
+
+    example_configurations:
+      pattern: "examples/{{scenario_name}}/"
+      examples:
+        - "examples/simple/"
+        - "examples/multi-region/"
+        - "examples/with-monitoring/"
+
+# =============================================================================
+# DATABASE CONVENTIONS
+# =============================================================================
+database:
+  table_naming:
+    case: "snake_case"
+    plural: true
+    examples:
+      - "users"
+      - "projects"
+      - "film_projects"
+      - "shot_lists"
+
+  column_naming:
+    case: "snake_case"
+    examples:
+      - "user_id"
+      - "created_at"
+      - "email_address"
+      - "is_active"
+
+  migration_files:
+    pattern: "{{timestamp}}_{{descriptive_action}}.py"
+    examples:
+      - "20250115143052_add_user_preferences_table.py"
+      - "20250120091530_add_index_on_email.py"
+      - "20250125174422_rename_project_status.py"
+
+  indexes:
+    pattern: "idx_{{table}}_{{columns}}"
+    case: "snake_case"
+    examples:
+      - "idx_users_email"
+      - "idx_projects_created_at"
+      - "idx_film_projects_status_created_at"
+
+  foreign_keys:
+    pattern: "fk_{{table}}_{{column}}_{{referenced_table}}"
+    case: "snake_case"
+    examples:
+      - "fk_tasks_user_id_users"
+      - "fk_projects_owner_id_users"
+      - "fk_shot_lists_project_id_projects"
+
+  constraints:
+    pattern: "chk_{{table}}_{{constraint}}"
+    case: "snake_case"
+    examples:
+      - "chk_users_age_positive"
+      - "chk_projects_start_before_end"
+      - "chk_orders_total_positive"
+
+# =============================================================================
+# TESTING CONVENTIONS
+# =============================================================================
+testing:
+  test_files:
+    python:
+      patterns:
+        - "test_{{module_name}}.py"
+        - "{{module_name}}_test.py"
+      examples:
+        - "test_user_service.py"
+        - "test_auth_handlers.py"
+        - "user_service_test.py"
+
+    typescript:
+      pattern: "{{component}}.test.ts"
+      examples:
+        - "UserProfile.test.tsx"
+        - "apiClient.test.ts"
+        - "formatDate.test.ts"
+
+  test_classes:
+    pattern: "Test{{ClassUnderTest}}"
+    case: "PascalCase"
+    examples:
+      - "TestUserService"
+      - "TestAuthController"
+      - "TestProjectManager"
+
+  test_methods:
+    pattern: "test_{{scenario}}_{{expected_outcome}}"
+    case: "snake_case"
+    examples:
+      - "test_create_user_with_valid_data_succeeds"
+      - "test_get_user_by_invalid_id_raises_not_found"
+      - "test_update_project_with_archived_status_fails"
+
+  fixtures:
+    pattern: "{{entity}}_fixture"
+    case: "snake_case"
+    examples:
+      - "user_fixture"
+      - "valid_project_fixture"
+      - "authenticated_client_fixture"
+
+  mocks:
+    patterns:
+      class: "Mock{{Service}}"
+      variable: "{{service}}_mock"
+    examples:
+      - "MockEmailService"
+      - "MockDatabaseConnection"
+      - "database_mock"
+      - "email_service_mock"
+
+# =============================================================================
+# ENVIRONMENT VARIABLES
+# =============================================================================
+environment_variables:
+  service_specific:
+    pattern: "LIGHTWAVE_{{SERVICE_NAME}}_{{VARIABLE}}"
+    case: "UPPER_SNAKE_CASE"
+    examples:
+      - "LIGHTWAVE_AUTH_SERVICE_DATABASE_URL"
+      - "LIGHTWAVE_API_GATEWAY_LOG_LEVEL"
+      - "LIGHTWAVE_WORKER_REDIS_HOST"
+
+  shared:
+    pattern: "LIGHTWAVE_SHARED_{{VARIABLE}}"
+    case: "UPPER_SNAKE_CASE"
+    examples:
+      - "LIGHTWAVE_SHARED_RABBITMQ_HOST"
+      - "LIGHTWAVE_SHARED_SECRET_KEY"
+      - "LIGHTWAVE_SHARED_LOG_LEVEL"
+
+  deprecated:
+    old_prefix: "LWM_"
+    note: "Replace LWM_ prefix with LIGHTWAVE_ in all new code"
+
+# =============================================================================
+# EVENT & MESSAGE NAMING (ASYNC SYSTEMS)
+# =============================================================================
+events_and_messages:
+  event_names:
+    pattern: "{{noun}}.{{verb}}"
+    tense: "past"
+    case: "snake_case"
+    examples:
+      - "user.created"
+      - "project.archived"
+      - "payment.processed"
+      - "file.uploaded"
+
+  queue_names:
+    pattern: "{{service}}-{{purpose}}-queue"
+    case: "kebab-case"
+    examples:
+      - "email-notifications-queue"
+      - "image-processing-queue"
+      - "video-encoding-queue"
+
+  topic_names:
+    pattern: "{{domain}}-{{entity}}-events"
+    case: "kebab-case"
+    examples:
+      - "user-account-events"
+      - "project-lifecycle-events"
+      - "payment-transaction-events"
+
+# =============================================================================
+# LOGGING & MONITORING
+# =============================================================================
+logging:
+  log_levels:
+    case: "UPPERCASE"
+    values: ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+
+  metric_names:
+    pattern: "{{service}}.{{resource}}.{{measurement}}"
+    case: "snake_case"
+    examples:
+      - "api_gateway.requests.count"
+      - "auth_service.login.duration"
+      - "database.queries.latency"
+
+  trace_ids:
+    patterns:
+      uuid: "{{uuid}}"
+      custom: "{{service}}-{{timestamp}}-{{random}}"
+    examples:
+      - "550e8400-e29b-41d4-a716-446655440000"
+      - "auth-20250115143052-abc123"
+
+# =============================================================================
+# FEATURE FLAGS & CONFIGURATION
+# =============================================================================
+feature_flags:
+  pattern: "FEATURE_{{FEATURE_NAME}}_ENABLED"
+  case: "UPPER_SNAKE_CASE"
+  examples:
+    - "FEATURE_NEW_UI_ENABLED"
+    - "FEATURE_ADVANCED_SEARCH_ENABLED"
+    - "FEATURE_BETA_API_ENABLED"
+
+  config_keys:
+    hierarchical: true
+    separator: "."
+    case: "snake_case"
+    examples:
+      - "database.pool.max_connections"
+      - "api.rate_limit.requests_per_minute"
+      - "cache.redis.ttl_seconds"
+
+  secret_names:
+    pattern: "{{service}}_{{resource}}_{{credential_type}}"
+    case: "snake_case"
+    examples:
+      - "auth_service_database_password"
+      - "api_gateway_jwt_secret"
+      - "worker_rabbitmq_connection_string"
+
+# =============================================================================
+# ERROR HANDLING
+# =============================================================================
+error_handling:
+  python_exceptions:
+    pattern: "{{Context}}{{Error}}Error"
+    case: "PascalCase"
+    suffix_required: "Error"
+    examples:
+      - "DatabaseConnectionError"
+      - "ValidationError"
+      - "AuthenticationError"
+      - "ResourceNotFoundError"
+
+  http_error_responses:
+    error_code_case: "snake_case"
+    format:
+      error_code: "{{error_type}}_{{detail}}"
+      status: "{{http_status_code}}"
+    examples:
+      - '{"error_code": "user_not_found", "status": 404}'
+      - '{"error_code": "invalid_credentials", "status": 401}'
+      - '{"error_code": "validation_failed", "status": 422}'
+
+  log_prefixes:
+    case: "UPPERCASE"
+    values: ["[ERROR]", "[WARNING]", "[CRITICAL]"]
+
+# =============================================================================
+# AGENT KNOWLEDGE MAPPING
+# =============================================================================
+agent_knowledge_mapping:
+  software_architect:
+    sections_required:
+      - "decision_trees"
+      - "case_styles"
+      - "repository_naming"
+      - "branch_naming"
+      - "commit_message"
+      - "infrastructure"
+      - "kubernetes"
+    description: "Needs comprehensive view of all naming conventions for architecture documentation"
+
+  api_architect:
+    sections_required:
+      - "api_endpoint_naming"
+      - "django_naming"
+      - "fastapi_naming"
+      - "python_naming"
+      - "database"
+      - "events_and_messages"
+    description: "Focuses on API design, backend patterns, and data contracts"
+
+  zen_code_generator:
+    sections_required:
+      - "python_naming"
+      - "typescript_naming"
+      - "django_naming"
+      - "fastapi_naming"
+      - "testing"
+      - "error_handling"
+    description: "Generates code following language-specific and framework-specific conventions"
+
+  codebase_structure_auditor:
+    sections_required:
+      - "decision_trees.repository_naming"
+      - "infrastructure"
+      - "kubernetes"
+      - "database"
+    description: "Validates project structure, directory organization, and file placement"
+
+  devops_specialist:
+    sections_required:
+      - "docker_image_tagging"
+      - "kubernetes"
+      - "infrastructure"
+      - "environment_variables"
+      - "feature_flags"
+    description: "Manages deployment, infrastructure, and operational configurations"
+
+# =============================================================================
+# CROSS-REFERENCES
+# =============================================================================
+cross_references:
+  related_metadata_files:
+    - path: ".agent/metadata/repository_map.yaml"
+      description: "Repository organization and workspace structure"
+
+    - path: ".agent/metadata/architecture_principles.yaml"
+      description: "High-level architectural decisions and patterns"
+
+    - path: ".agent/metadata/technology_stack.yaml"
+      description: "Technology choices and framework versions"
+
+  external_specifications:
+    - name: "Conventional Commits"
+      url: "https://www.conventionalcommits.org/"
+      sections: ["commit_message"]
+
+    - name: "PEP 8 - Python Style Guide"
+      url: "https://peps.python.org/pep-0008/"
+      sections: ["python_naming"]
+
+    - name: "Kubernetes Recommended Labels"
+      url: "https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/"
+      sections: ["kubernetes.standard_labels"]
+
+    - name: "Semantic Versioning"
+      url: "https://semver.org/"
+      sections: ["docker_image_tagging", "branch_naming"]
+
+# =============================================================================
+# VALIDATION RULES
+# =============================================================================
+validation_rules:
+  repository_names:
+    - rule: "Must start with 'lightwave-' prefix"
+      severity: "error"
+    - rule: "Must use kebab-case"
+      severity: "error"
+    - rule: "Maximum 100 characters"
+      severity: "warning"
+    - rule: "No uppercase letters allowed"
+      severity: "error"
+
+  branch_names:
+    - rule: "Must include task ID (us-XXX, task-XXX, bug-XXX)"
+      severity: "error"
+      exceptions: ["main", "develop", "release/*", "hotfix/*"]
+    - rule: "Must use kebab-case for slug"
+      severity: "error"
+    - rule: "Maximum 100 characters"
+      severity: "warning"
+
+  docker_image_tags:
+    - rule: "Production tags MUST use semantic versioning"
+      severity: "error"
+    - rule: "Never use 'latest' tag in production"
+      severity: "error"
+    - rule: "Development tags should include git SHA"
+      severity: "warning"
+
+  environment_variables:
+    - rule: "Must start with LIGHTWAVE_ prefix"
+      severity: "error"
+    - rule: "Must use UPPER_SNAKE_CASE"
+      severity: "error"
+    - rule: "Avoid LWM_ prefix (deprecated)"
+      severity: "warning"
+
+# =============================================================================
+# QUICK REFERENCE TABLES
+# =============================================================================
+quick_reference:
+  case_styles_at_a_glance:
+    - style: "kebab-case"
+      example: "user-profile"
+      usage: "URLs, Git repos, Docker images, K8s resources"
+
+    - style: "snake_case"
+      example: "user_profile"
+      usage: "Python files/vars, DB tables, API params"
+
+    - style: "PascalCase"
+      example: "UserProfile"
+      usage: "Classes, Components, Types"
+
+    - style: "camelCase"
+      example: "userProfile"
+      usage: "JS/TS variables, functions"
+
+    - style: "UPPER_SNAKE_CASE"
+      example: "USER_PROFILE"
+      usage: "Constants, env vars"
+
+  common_patterns:
+    git_branch: "feature/{{task-id}}-{{description}}"
+    docker_tag: "v{{semver}} or dev-{{sha}}"
+    k8s_label: "app.kubernetes.io/name"
+    python_exception: "{{Context}}{{Error}}Error"
+    api_endpoint: "/api/v1/{{resource-plural}}"
+    django_app: "snake_case (plural)"
+    fastapi_schema: "{{Resource}}{{Action}}{{Type}}"
+    terraform_module: "terraform-{{provider}}-{{name}}"
+    test_method: "test_{{scenario}}_{{outcome}}"
+    feature_flag: "FEATURE_{{NAME}}_ENABLED"
+
+# =============================================================================
+# VERSION HISTORY
+# =============================================================================
+version_history:
+  - version: "2.0.0"
+    date: "2025-10-28"
+    changes:
+      - "Migrated from markdown to YAML for programmatic consumption"
+      - "Updated github_org from 'kiwi-dev-la' to 'lightwave-media'"
+      - "Updated prefix from 'LWM' to 'LIGHTWAVE' for environment variables"
+      - "Added decision trees for conditional naming logic"
+      - "Added agent knowledge mapping"
+      - "Added validation rules"
+      - "Added cross-references to related metadata files"
+    author: "software-architect"
+
+  - version: "1.0.0"
+    date: "2024-12-15"
+    changes:
+      - "Initial markdown version"
+      - "Defined all naming conventions across ecosystem"
+    author: "Joel Schaeffer"
+
+# =============================================================================
+# NOTES
+# =============================================================================
+notes:
+  - "This file is the SSOT for all naming conventions in the LightWave ecosystem"
+  - "All agents MUST consult this file before generating names"
+  - "Deprecated references (kiwi-dev-la, LWM) should be replaced in existing code over time"
+  - "When in doubt, prefer clarity and consistency over brevity"
+  - "Update this file when introducing new naming patterns or conventions"

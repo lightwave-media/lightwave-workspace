@@ -1,0 +1,202 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://lightwave-media.ltd/schemas/architecture.schema.json",
+  "title": "LightWave Architecture Metadata",
+  "description": "Schema for architecture metadata files in .agent/metadata/",
+  "type": "object",
+  "required": [
+    "version",
+    "last_updated",
+    "domain"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Document version (semantic versioning)"
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of last update (YYYY-MM-DD)"
+    },
+    "domain": {
+      "type": "string",
+      "enum": [
+        "frontend",
+        "backend",
+        "infrastructure",
+        "testing",
+        "deployment",
+        "security"
+      ],
+      "description": "Architecture domain this metadata covers"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "active", "deprecated"],
+      "description": "Document status"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Team/person responsible for maintaining this"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 50,
+      "description": "Detailed description of what this architecture metadata covers"
+    },
+    "related_docs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Related documentation files"
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["decision", "rationale", "alternatives_considered"],
+        "properties": {
+          "decision": {
+            "type": "string",
+            "description": "What was decided"
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why this was chosen"
+          },
+          "alternatives_considered": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "option": {
+                  "type": "string"
+                },
+                "rejected_because": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "consequences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Known consequences of this decision"
+          },
+          "date_decided": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "constraint": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["technical", "business", "security", "performance", "cost"]
+          },
+          "impact": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "critical"]
+          }
+        }
+      }
+    },
+    "tech_stack": {
+      "type": "object",
+      "description": "Technologies used in this domain"
+    },
+    "patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string"
+          },
+          "when_to_use": {
+            "type": "string"
+          },
+          "example": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "anti_patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "anti_pattern": {
+            "type": "string"
+          },
+          "why_avoid": {
+            "type": "string"
+          },
+          "better_alternative": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "performance_targets": {
+          "type": "object"
+        },
+        "quality_targets": {
+          "type": "object"
+        },
+        "monitoring": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "changelog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["version", "date", "changes"],
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^\\d+\\.\\d+\\.\\d+$"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "breaking_changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

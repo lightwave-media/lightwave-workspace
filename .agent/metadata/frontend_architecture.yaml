@@ -1,0 +1,337 @@
+# Frontend Architecture Metadata
+# Version: 1.0.0
+# Last Updated: 2025-10-25
+# Purpose: Structured queryable architecture decisions for RAG context
+
+version: "1.0.0"
+last_updated: "2025-10-25"
+owner: "Joel Schaeffer"
+status: "active"
+
+architecture:
+  name: "LightWave Frontend Architecture"
+  philosophy: "Notion as Operating System, GitHub as Execution Layer"
+
+  layers:
+    frontend:
+      technology: "Next.js 15+ with Payload CMS"
+      hosting: "Cloudflare Pages/Workers"
+      deployment_trigger: "GitHub push to main branch"
+      domains:
+        - name: "lightwave-media.site"
+          status: "active"
+          purpose: "Main business site with owner dashboard"
+        - name: "joelschaeffer.com"
+          status: "planned"
+          purpose: "Portfolio (cinematography + photography)"
+        - name: "cineos.io"
+          status: "future"
+        - name: "createos.io"
+          status: "future"
+        - name: "photographyos.io"
+          status: "future"
+
+    backend:
+      technology: "Django REST Framework"
+      hosting: "AWS ECS Fargate"
+      domain: "api.lightwave-media.ltd (Cloudflare DNS)"
+      database: "PostgreSQL (RDS)"
+      responsibilities:
+        - "User authentication (Django Auth)"
+        - "Session management"
+        - "Email delivery (Django Email backend)"
+        - "Business logic APIs"
+        - "Data persistence"
+
+    shared_packages:
+      location: "Backend/Lightwave-Platform/"
+      purpose: "Shared libraries published to frontends"
+      packages:
+        - "@lightwave/ui"
+        - "@lightwave/auth-client"
+        - "@lightwave/payload-shared"
+
+auth:
+  provider: "Django Auth"
+  strategy: "session-based"
+  current_implementation:
+    type: "session"
+    flow: "Django sessions + httpOnly cookies"
+    security:
+      - "HTTPS only"
+      - "HttpOnly cookies (no JS access)"
+      - "SameSite=None (cross-domain frontend/backend)"
+      - "CORS enabled"
+
+  future_support:
+    - type: "jwt"
+      use_case: "Mobile apps, offline-first apps"
+      library: "djangorestframework-simplejwt"
+    - type: "oauth"
+      use_case: "Third-party integrations, SSO"
+      library: "django-oauth-toolkit"
+
+  endpoints:
+    login:
+      url: "/api/auth/login/"
+      method: "POST"
+      body: { email: "string", password: "string" }
+      response: { user: "User object" }
+      sets_cookie: true
+
+    logout:
+      url: "/api/auth/logout/"
+      method: "POST"
+      clears_cookie: true
+
+    me:
+      url: "/api/auth/me/"
+      method: "GET"
+      response: { user: "User object | null" }
+      requires_auth: false
+
+  cors:
+    required: true
+    package: "django-cors-headers"
+    allowed_origins:
+      - "https://lightwave-media.site"
+      - "https://joelschaeffer.com"
+      - "https://cineos.io"
+      - "https://createos.io"
+      - "https://photographyos.io"
+      - "http://localhost:3000"  # dev only
+    allow_credentials: true
+    cookie_settings:
+      SESSION_COOKIE_SECURE: true
+      SESSION_COOKIE_HTTPONLY: true
+      SESSION_COOKIE_SAMESITE: "None"
+      SESSION_COOKIE_DOMAIN: ".lightwave-media.ltd"
+
+payload:
+  strategy: "hybrid"
+  version: "3.59+"
+
+  shared_collections:
+    - name: "Media"
+      location: "@lightwave/payload-shared"
+      storage: "Cloudflare R2 or AWS S3"
+      reason: "Centralized asset library across all sites"
+      fields:
+        - name: "alt"
+          type: "text"
+          required: true
+        - name: "caption"
+          type: "richText"
+        - name: "site"
+          type: "select"
+          hasMany: true
+          options: ["lightwave-media", "joelschaeffer", "cineos", "createos", "photographyos"]
+      access:
+        read: "public"
+        create: "authenticated"
+        update: "authenticated"
+        delete: "admin"
+
+    - name: "Users"
+      location: "@lightwave/payload-shared"
+      source: "Django backend (synced)"
+      reason: "Single source of truth for user accounts"
+      sync_method: "Django API calls Payload API on user create/update"
+
+  site_specific_collections:
+    lightwave-media.site:
+      - name: "Pages"
+        has_blocks: true
+        has_drafts: true
+      - name: "Posts"
+        has_blocks: true
+        has_drafts: true
+      - name: "Products"
+        has_blocks: false
+      - name: "Orders"
+        has_blocks: false
+
+    joelschaeffer.com:
+      - name: "Pages"
+        has_blocks: true
+        has_drafts: true
+      - name: "Projects"
+        has_blocks: false
+        has_drafts: true
+        purpose: "Cinematography/photography projects"
+      - name: "Photos"
+        has_blocks: false
+        purpose: "Portfolio images"
+
+  shared_blocks:
+    location: "@lightwave/payload-shared"
+    blocks:
+      - name: "Hero"
+        fields: ["heading", "subheading", "cta", "backgroundImage"]
+      - name: "Content"
+        fields: ["richText", "layout"]
+      - name: "CallToAction"
+        fields: ["heading", "description", "primaryCTA", "secondaryCTA"]
+      - name: "MediaBlock"
+        fields: ["media", "caption", "position"]
+      - name: "Archive"
+        fields: ["relationTo", "populateBy", "limit"]
+
+  database_strategy:
+    approach: "separate_databases"
+    reason: "Independence and easier scaling"
+    databases:
+      - site: "lightwave-media.site"
+        type: "MongoDB or PostgreSQL"
+        name: "lightwave-media-db"
+        collections: ["Pages", "Posts", "Products", "Orders", "Media (site-scoped)"]
+
+      - site: "joelschaeffer.com"
+        type: "MongoDB or PostgreSQL"
+        name: "joelschaeffer-db"
+        collections: ["Pages", "Projects", "Photos", "Media (site-scoped)"]
+
+deployment:
+  frontend:
+    platform: "Cloudflare Pages"
+    trigger: "GitHub push to main"
+    build_command: "pnpm build"
+    output_directory: ".next"
+    environment_variables:
+      - "NEXT_PUBLIC_API_URL"
+      - "DATABASE_URI"
+      - "PAYLOAD_SECRET"
+      - "NEXT_PUBLIC_SERVER_URL"
+    features:
+      - "Edge network (300+ cities)"
+      - "Zero-config deployment"
+      - "Free SSL certificates"
+      - "Built-in DDoS protection"
+      - "Analytics"
+
+  backend:
+    platform: "AWS ECS Fargate"
+    status: "already_deployed"
+    domain: "api.lightwave-media.ltd"
+
+testing:
+  coverage_requirement: "100%"
+  mandate: "All new code must have 100% test coverage"
+
+  tools:
+    unit:
+      name: "Vitest"
+      config: "vitest.config.mts"
+      command: "pnpm test:int"
+
+    component:
+      name: "Testing Library"
+      package: "@testing-library/react"
+      command: "pnpm test:int"
+
+    e2e:
+      name: "Playwright"
+      config: "playwright.config.ts"
+      command: "pnpm test:e2e"
+      browsers: ["chromium", "firefox", "webkit"]
+
+  required_test_scenarios:
+    auth:
+      - "User can log in with valid credentials"
+      - "Login fails with invalid credentials (401)"
+      - "User can log out"
+      - "Logged-out user redirected to login"
+      - "Session persists across page refreshes"
+
+    payload:
+      - "Admin can create/edit/delete content"
+      - "Draft content not visible to public"
+      - "Published content visible to public"
+      - "Live preview works for drafts"
+
+    frontend:
+      - "Pages render correctly (SSR)"
+      - "Images optimized and lazy loaded"
+      - "Forms submit successfully"
+      - "Error states handled gracefully"
+
+directory_structure:
+  frontend_sites:
+    location: "Frontend/"
+    sites:
+      - name: "lightwave-media-site"
+        domain: "lightwave-media.site"
+        structure:
+          - "website/"
+          - "website/src/app/"
+          - "website/src/collections/"
+          - "website/src/blocks/"
+          - "website/src/components/"
+          - "website/payload.config.ts"
+          - "pnpm-workspace.yaml"
+          - "CLAUDE.md"
+
+      - name: "lightwave-joelschaeffer"
+        domain: "joelschaeffer.com"
+        status: "restructuring_needed"
+        target_structure:
+          - "website/"
+          - "website/src/app/"
+          - "website/src/collections/"
+          - "website/src/blocks/"
+          - "website/src/components/"
+          - "website/payload.config.ts"
+          - "CLAUDE.md"
+
+  shared_packages:
+    location: "Backend/Lightwave-Platform/"
+    packages:
+      - name: "lightwave-ui"
+        npm_name: "@lightwave/ui"
+        type: "design-system"
+
+      - name: "lightwave-auth-client"
+        npm_name: "@lightwave/auth-client"
+        type: "authentication"
+
+      - name: "lightwave-payload-shared"
+        npm_name: "@lightwave/payload-shared"
+        type: "cms-shared"
+
+performance:
+  core_web_vitals:
+    lcp:
+      metric: "Largest Contentful Paint"
+      target: "< 2.5s"
+    fid:
+      metric: "First Input Delay"
+      target: "< 100ms"
+    cls:
+      metric: "Cumulative Layout Shift"
+      target: "< 0.1"
+
+  bundle_size:
+    javascript_first_load: "< 200 KB"
+    css_first_load: "< 50 KB"
+    images: "WebP/AVIF, lazy loaded"
+
+security:
+  frontend:
+    - "HTTPS only"
+    - "Content Security Policy (CSP)"
+    - "CORS restrictions"
+    - "HttpOnly cookies"
+    - "SameSite cookies"
+
+  backend:
+    - "Django Auth (password hashing, session management)"
+    - "CSRF protection"
+    - "SQL injection protection (Django ORM)"
+    - "XSS protection (Django template escaping)"
+
+# Query Examples:
+# - "What's the auth strategy?" → auth.strategy
+# - "What are the Django auth endpoints?" → auth.endpoints
+# - "What collections does joelschaeffer.com have?" → payload.site_specific_collections['joelschaeffer.com']
+# - "What's the test coverage requirement?" → testing.coverage_requirement
+# - "Where should @lightwave/ui live?" → directory_structure.shared_packages.location

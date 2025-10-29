@@ -1,0 +1,218 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://lightwave-media.ltd/schemas/package.schema.json",
+  "title": "LightWave Package Metadata",
+  "description": "Schema for package registry in .agent/metadata/packages.json",
+  "type": "object",
+  "required": [
+    "name",
+    "location",
+    "type",
+    "purpose",
+    "status"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^@lightwave/[a-z-]+$",
+      "description": "NPM package name (must start with @lightwave/)"
+    },
+    "location": {
+      "type": "string",
+      "description": "Filesystem path relative to workspace root"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "ui_library",
+        "authentication",
+        "cms_shared",
+        "utilities",
+        "testing",
+        "documentation"
+      ],
+      "description": "Package category"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 200,
+      "description": "Concise description of package purpose"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "not_started",
+        "in_development",
+        "testing",
+        "published",
+        "deprecated"
+      ],
+      "description": "Current package status"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Current published version (semantic versioning)"
+    },
+    "tech_stack": {
+      "type": "object",
+      "properties": {
+        "language": {
+          "type": "string",
+          "enum": ["TypeScript", "JavaScript", "Python"]
+        },
+        "framework": {
+          "type": "string"
+        },
+        "build_tool": {
+          "type": "string",
+          "enum": ["tsup", "tsc", "rollup", "webpack", "vite"]
+        },
+        "test_framework": {
+          "type": "string",
+          "enum": ["Vitest", "Jest", "Playwright", "pytest"]
+        }
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Key external dependencies"
+    },
+    "internal_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^@lightwave/[a-z-]+$"
+      },
+      "description": "Other @lightwave packages this depends on"
+    },
+    "consumers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Projects/packages that consume this package"
+    },
+    "entry_points": {
+      "type": "object",
+      "properties": {
+        "main": {
+          "type": "string",
+          "description": "Main entry point (CommonJS)"
+        },
+        "module": {
+          "type": "string",
+          "description": "ESM entry point"
+        },
+        "types": {
+          "type": "string",
+          "description": "TypeScript declarations"
+        }
+      }
+    },
+    "exports": {
+      "type": "object",
+      "description": "Package exports map (for modern Node.js)"
+    },
+    "scripts": {
+      "type": "object",
+      "properties": {
+        "build": {
+          "type": "string"
+        },
+        "test": {
+          "type": "string"
+        },
+        "lint": {
+          "type": "string"
+        },
+        "publish": {
+          "type": "string"
+        }
+      }
+    },
+    "testing": {
+      "type": "object",
+      "properties": {
+        "coverage_requirement": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "test_command": {
+          "type": "string"
+        },
+        "e2e_tests": {
+          "type": "boolean"
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "properties": {
+        "registry": {
+          "type": "string",
+          "enum": ["npm", "private_registry"]
+        },
+        "access": {
+          "type": "string",
+          "enum": ["public", "private"]
+        },
+        "publish_workflow": {
+          "type": "string",
+          "description": "GitHub Actions workflow for publishing"
+        }
+      }
+    },
+    "documentation": {
+      "type": "object",
+      "properties": {
+        "readme": {
+          "type": "string",
+          "description": "Path to README.md"
+        },
+        "api_docs": {
+          "type": "string",
+          "description": "Path to API documentation"
+        },
+        "examples": {
+          "type": "string",
+          "description": "Path to examples directory"
+        }
+      }
+    },
+    "created_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "updated_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Team/person responsible for this package"
+    },
+    "repository": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["git"]
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "directory": {
+          "type": "string",
+          "description": "Subdirectory in monorepo (if applicable)"
+        }
+      }
+    }
+  }
+}

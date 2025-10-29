@@ -1,0 +1,182 @@
+# Cloudflare Workers Configuration Metadata
+# Version: 1.0.0
+# Last Updated: 2025-10-27
+
+version: "1.0.0"
+last_updated: "2025-10-27"
+
+# IMPORTANT: Preview URL Behavior Change (Effective October 2024)
+# Source: Cloudflare notification received 2025-10-27
+
+preview_urls:
+  behavior_change:
+    effective_date: "2024-10"
+    description: |
+      Default behavior for Cloudflare Workers Preview URLs now automatically matches
+      the setting of your workers.dev subdomain.
+
+    default_logic:
+      - rule: "Neither setting configured"
+        result: "Both workers.dev route and Preview URL default to ENABLED"
+
+      - rule: "workers.dev route is ENABLED, Preview URL not set"
+        result: "Preview URL defaults to ENABLED"
+
+      - rule: "workers.dev route is DISABLED, Preview URL not set"
+        result: "Preview URL defaults to DISABLED"
+
+    override: |
+      You can always override this by explicitly enabling or disabling the Preview URL
+      in your Worker's configuration through the API, Dashboard, or Wrangler.
+
+  wrangler_version_behavior:
+    before_v4_34_0:
+      preview_url_default: "ENABLED"
+      matches_workers_dev: false
+      note: "Defaults to enabled regardless of workers.dev setting"
+
+    v4_34_0_to_v4_43_x:
+      preview_url_default: "DISABLED"
+      matches_workers_dev: false
+      note: "Defaults to disabled regardless of workers.dev setting"
+
+    v4_44_0_and_later:
+      preview_url_default: "MATCHES_WORKERS_DEV"
+      matches_workers_dev: true
+      note: "Matches your workers.dev setting (current behavior)"
+      recommended: true
+
+  security_recommendations:
+    - action: "Enable Cloudflare Access"
+      description: "Limit access to Preview URLs to specific users or groups"
+      location: "Worker settings in Cloudflare Dashboard"
+      benefit: "Secure both workers.dev subdomain and Preview URLs in one click"
+
+    - action: "Explicitly configure Preview URL setting"
+      description: "Don't rely on defaults - set explicitly in wrangler.toml"
+      benefit: "Clear intent, prevents surprises on version upgrades"
+
+    - action: "Audit existing Workers"
+      description: "Check which Workers have workers.dev/Preview URLs enabled"
+      benefit: "Ensure no Workers are unintentionally exposed"
+
+  rationale:
+    problem: |
+      Disabling workers.dev route was ambiguous - Preview URLs (served as
+      preview-id-worker-name.account-name.workers.dev) would still be live even if
+      workers.dev route was disabled. This could unintentionally expose preview URLs
+      to the public Internet.
+
+    solution: |
+      New behavior ensures Preview URL settings align with workers.dev configuration
+      by default, providing more secure and predictable experience.
+
+    trade_offs:
+      - benefit: "More intuitive behavior - disabling workers.dev disables previews"
+      - benefit: "Better security - prevents accidental exposure"
+      - drawback: "Breaking change for users who relied on old defaults"
+      - mitigation: "Explicit configuration in wrangler.toml recommended"
+
+# LightWave Workers Configuration
+
+lightwave_workers:
+  status: "To be audited"
+  action_required: true
+
+  audit_checklist:
+    - task: "Identify all Workers in LightWave Cloudflare account"
+      status: "pending"
+
+    - task: "Check current workers.dev route settings"
+      status: "pending"
+
+    - task: "Check current Preview URL settings"
+      status: "pending"
+
+    - task: "Verify Wrangler version (should be >= v4.44.0)"
+      status: "pending"
+
+    - task: "Update wrangler.toml to explicitly set preview_urls setting"
+      status: "pending"
+
+    - task: "Consider enabling Cloudflare Access for sensitive Workers"
+      status: "pending"
+
+  configuration_template:
+    wrangler_toml_example: |
+      # Explicitly configure Preview URL behavior
+      [env.production]
+      workers_dev = false        # Disable workers.dev route in production
+      preview_urls = false       # Explicitly disable Preview URLs
+
+      [env.staging]
+      workers_dev = true         # Enable workers.dev route in staging
+      preview_urls = true        # Explicitly enable Preview URLs for testing
+
+# Related Configuration Files
+
+related_files:
+  terraform:
+    - "Infrastructure/lightwave-infrastructure/modules/cloudflare/"
+    - "Infrastructure/lightwave-infrastructure-live/*/cloudflare.hcl"
+
+  wrangler:
+    - "Backend/Lightwave-Platform/wrangler.toml (if exists)"
+    - "Frontend/*/wrangler.toml (if using Workers)"
+
+  documentation:
+    - ".agent/metadata/deployment.yaml"
+    - "CLAUDE.md (root workspace)"
+
+# Future Actions
+
+future_actions:
+  - description: "Audit all Workers for Preview URL exposure"
+    priority: "high"
+    estimated_effort: "1 hour"
+
+  - description: "Update Terraform to explicitly configure Preview URLs"
+    priority: "medium"
+    estimated_effort: "2 hours"
+
+  - description: "Document Worker security best practices in SOP"
+    priority: "medium"
+    estimated_effort: "1 hour"
+
+  - description: "Enable Cloudflare Access for production Workers"
+    priority: "low"
+    estimated_effort: "4 hours"
+    note: "Only if Workers are used in production"
+
+# Reference Links
+
+reference:
+  cloudflare_docs:
+    - "https://developers.cloudflare.com/workers/configuration/preview-urls/"
+    - "https://developers.cloudflare.com/workers/configuration/routing/workers-dev/"
+
+  wrangler_docs:
+    - "https://developers.cloudflare.com/workers/wrangler/configuration/"
+
+  cloudflare_access:
+    - "https://developers.cloudflare.com/cloudflare-one/applications/configure-apps/self-hosted-apps/"
+
+# Notes for Claude
+
+notes_for_claude:
+  when_to_use_this_file:
+    - "Deploying new Cloudflare Workers"
+    - "Auditing Worker security configuration"
+    - "Troubleshooting Preview URL access issues"
+    - "Updating Terraform for Worker deployments"
+
+  key_takeaways:
+    - "Preview URLs now match workers.dev setting by default (Wrangler v4.44.0+)"
+    - "Always explicitly configure preview_urls in wrangler.toml"
+    - "Use Cloudflare Access to secure both workers.dev and Preview URLs"
+    - "Audit existing Workers to ensure no unintended exposure"
+
+  integration_with_deployment:
+    - "Check this file when working on Cloudflare infrastructure"
+    - "Reference when creating new Workers"
+    - "Consider security implications before enabling Preview URLs"

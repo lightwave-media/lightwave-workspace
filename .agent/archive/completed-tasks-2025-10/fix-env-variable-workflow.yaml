@@ -1,0 +1,343 @@
+# Fix Environment Variable Workflow - Pure Runtime Secrets
+
+version: 1.0.0
+status: todo
+priority: high
+created: 2025-10-26
+assigned_to: v_senior_developer
+estimated_hours: 2
+
+## Overview
+
+Consolidate to single source of truth (AWS Parameter Store) with runtime secret loading.
+Remove broken hybrid approach (.env.master sync) that was never fully implemented.
+
+## Problem Statement
+
+The current environment variable system has two conflicting paths:
+
+1. **Path 1 (Working)**: AWS → .envrc → Runtime Environment
+   - Loads secrets when you cd into directory
+   - Works perfectly for local development
+
+2. **Path 2 (Broken)**: .env.master → distribute_env.py → Service .env files
+   - .env.master has placeholder values
+   - Individual service .env files inherit placeholders
+   - Docker containers fail due to invalid secrets
+
+This creates confusion and unpredictable behavior depending on which path is used.
+
+## Architecture Decision
+
+**ADR-006: Pure Runtime Secret Loading**
+
+- **Source of Truth**: AWS Systems Manager Parameter Store
+- **Loading Method**: Runtime via `.envrc` + `lightwave-aws-cli.py`
+- **Local Development**: direnv automatically loads secrets on `cd`
+- **Docker Containers**: Inherit environment from shell (no .env files for secrets)
+- **No Sync Scripts**: No intermediary caching in .env.master
+
+## What's Being Fixed
+
+1. Remove placeholder confusion from `.env.master`
+2. Fix Docker secret loading (inherit from shell environment)
+3. Clean up documentation (remove references to non-existent scripts)
+4. Add validation to ensure secrets are loaded before starting services
+
+## Task Breakdown
+
+### Phase 1: Cleanup & Documentation (30 min)
+
+**1.1 Update .env.master**
+- Remove all secret placeholders (NOTION_API_KEY, ANTHROPIC_API_KEY, etc.)
+- Keep only local development configuration (DEBUG, LOG_LEVEL, etc.)
+- Add header comment explaining "local dev config only"
+- Add comment directing users to AWS for production secrets
+
+**1.2 Clean Up Documentation**
+- Remove all references to `sync_secrets_from_aws.py` from docs
+- Update `.claude/SECRETS_MAP.md` with actual workflow
+- Clarify in docs: AWS is source of truth, no local caching
+
+**Files to modify:**
+- `Backend/Lightwave-Platform/.env.master`
+- `.claude/SECRETS_MAP.md`
+- Root `CLAUDE.md` (if references exist)
+
+### Phase 2: Docker Integration (45 min)
+
+**2.1 Update docker-compose.yml**
+- Remove `env_file: .env` where it causes issues
+- Use `environment:` block to inherit from shell
+- Add validation that required secrets are present
+- Ensure containers fail fast if secrets missing
+
+**2.2 Create Validation Script**
+- Create `scripts/validate_secrets.py`
+- Check all required secrets from AWS are loaded
+- Provide helpful error messages with AWS setup instructions
+- Exit with clear status code
+
+**2.3 Create Startup Wrapper**
+- Create `scripts/docker-up.sh` that validates before starting
+- Run `validate_secrets.py` first
+- Only start containers if validation passes
+
+**Files to create:**
+- `scripts/validate_secrets.py`
+- `scripts/docker-up.sh`
+
+**Files to modify:**
+- `Backend/Lightwave-Platform/backend/docker-compose.yml`
+
+### Phase 3: Validation & Safety (30 min)
+
+**3.1 Create .envrc.example**
+- Template showing required AWS configuration
+- Instructions for setting up direnv
+- List of required AWS profile settings
+
+**3.2 Update Troubleshooting Docs**
+- Add "Secrets not loading" section
+- Add "Docker container fails with invalid secret" section
+- Add "How to validate secrets are loaded" section
+
+**3.3 Add Pre-flight Check**
+- Update `.envrc` to validate AWS CLI available
+- Add check that `lightwave-aws-cli.py` exists
+- Show clear error if AWS_PROFILE not set
+
+**Files to create:**
+- `.envrc.example`
+
+**Files to modify:**
+- `.claude/TROUBLESHOOTING.md`
+- `.envrc` (add validation)
+
+## Implementation Details
+
+### validate_secrets.py Structure
+
+```python
+#!/usr/bin/env python3
+"""
+Validate that all required secrets are loaded from AWS Parameter Store.
+
+Usage:
+    python scripts/validate_secrets.py
+
+Exit codes:
+    0: All secrets present
+    1: Missing required secrets
+    2: AWS credentials not configured
+"""
+
+import os
+import sys
+from typing import List, Tuple
+
+# Required secrets for backend services
+REQUIRED_SECRETS = [
+    "NOTION_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "CLOUDFLARE_API_TOKEN",
+    "DATABASE_URL",
+    "STRIPE_SECRET_KEY",
+    # Add more as needed
+]
+
+def check_secrets() -> Tuple[bool, List[str]]:
+    """Check if all required secrets are present in environment."""
+    missing = []
+    for secret in REQUIRED_SECRETS:
+        if not os.getenv(secret):
+            missing.append(secret)
+    return len(missing) == 0, missing
+
+def main() -> int:
+    print("🔍 Validating environment secrets...\n")
+
+    all_present, missing = check_secrets()
+
+    if all_present:
+        print("✅ All required secrets are loaded!")
+        return 0
+
+    print("❌ Missing required secrets:")
+    for secret in missing:
+        print(f"   - {secret}")
+
+    print("\n💡 To fix this:")
+    print("   1. Set AWS profile: export AWS_PROFILE=lightwave-admin-new")
+    print("   2. Run: direnv allow")
+    print("   3. Verify: echo $NOTION_API_KEY")
+
+    return 1
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
+
+### docker-compose.yml Environment Pattern
+
+```yaml
+services:
+  backend:
+    build: .
+    environment:
+      # Inherit from shell environment (loaded via .envrc)
+      - NOTION_API_KEY=${NOTION_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://lightwave:lightwave_pass@postgres:5432/lightwave}
+      # Local dev config can still come from .env file
+    env_file:
+      - .env  # Only for local dev config, NOT secrets
+```
+
+### .env.master New Structure
+
+```bash
+# ============================================================================
+# LightWave Platform - Local Development Configuration
+# ============================================================================
+# This file contains ONLY local development configuration.
+#
+# SECRETS ARE LOADED FROM AWS PARAMETER STORE AT RUNTIME
+# See: .envrc for secret loading mechanism
+# Source: AWS Systems Manager Parameter Store (/lightwave/prod/)
+#
+# DO NOT add production secrets to this file!
+# ============================================================================
+
+# ============================================================================
+# Local Development Settings
+# ============================================================================
+DEBUG=True
+LOG_LEVEL=INFO
+DJANGO_LOG_LEVEL=DEBUG
+ENVIRONMENT=development
+
+# ============================================================================
+# Local Service Endpoints (Docker Compose)
+# ============================================================================
+DATABASE_URL=postgresql://lightwave:lightwave_pass@postgres:5432/lightwave
+REDIS_URL=redis://redis:6379/0
+CELERY_BROKER_URL=redis://redis:6379/0
+
+# ============================================================================
+# Local CORS Configuration
+# ============================================================================
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002
+ALLOWED_HOSTS=localhost,127.0.0.1,backend
+
+# ============================================================================
+# Optional Development Tools
+# ============================================================================
+USE_DEBUG_TOOLBAR=True
+USE_S3=False
+
+# ============================================================================
+# Production Secrets (Loaded from AWS at Runtime)
+# ============================================================================
+# The following secrets are loaded from AWS Parameter Store via .envrc:
+# - NOTION_API_KEY
+# - ANTHROPIC_API_KEY
+# - CLOUDFLARE_API_TOKEN
+# - STRIPE_SECRET_KEY
+# - GITHUB_TOKEN
+# - AWS_ACCESS_KEY_ID
+# - AWS_SECRET_ACCESS_KEY
+#
+# To access production secrets:
+#   1. Set AWS profile: export AWS_PROFILE=lightwave-admin-new
+#   2. Allow direnv: direnv allow
+#   3. Secrets automatically loaded when cd into workspace
+#
+# To verify secrets are loaded:
+#   echo $NOTION_API_KEY
+#   python scripts/validate_secrets.py
+# ============================================================================
+```
+
+## Acceptance Criteria
+
+- [ ] No placeholder values in any `.env` files
+- [ ] Secrets loaded from AWS at runtime via `.envrc`
+- [ ] `validate_secrets.py` passes all checks
+- [ ] Docker containers start successfully with AWS secrets
+- [ ] Documentation reflects actual implementation (no sync script references)
+- [ ] New developer can follow `.envrc.example` to set up environment
+- [ ] `docker-up.sh` validates before starting containers
+
+## Testing Plan
+
+### Test 1: Fresh Terminal
+```bash
+# Simulate new developer setup
+cd /Users/joelschaeffer/dev/lightwave
+direnv allow
+echo $NOTION_API_KEY  # Should show real value
+python scripts/validate_secrets.py  # Should pass
+```
+
+### Test 2: Validation Script
+```bash
+# Test validation catches missing secrets
+unset NOTION_API_KEY
+python scripts/validate_secrets.py  # Should fail with helpful message
+```
+
+### Test 3: Docker Startup
+```bash
+# Test containers start with secrets
+export AWS_PROFILE=lightwave-admin-new
+direnv allow
+cd Backend/Lightwave-Platform/backend
+./scripts/docker-up.sh  # Should validate then start
+docker compose exec backend env | grep NOTION_API_KEY  # Should show real value
+```
+
+### Test 4: Documentation Accuracy
+```bash
+# Verify no broken references
+grep -r "sync_secrets_from_aws" .claude/  # Should return nothing
+grep -r "sync.*AWS" Backend/Lightwave-Platform/.env.master  # Should return nothing
+```
+
+## Rollback Plan
+
+If issues arise, rollback is simple:
+
+1. Git revert changes to `.env.master`
+2. Keep existing `.envrc` (already working)
+3. No new dependencies introduced, so no cleanup needed
+
+## What We're NOT Doing
+
+- ❌ Creating `sync_secrets_from_aws.py` (don't need it)
+- ❌ Maintaining `.env.master` as secret cache
+- ❌ Syncing AWS → local files (runtime only)
+- ❌ Changing AWS Parameter Store structure
+- ❌ Modifying `lightwave-aws-cli.py` (already perfect)
+
+## Related Documentation
+
+- `.claude/SECRETS_MAP.md` - Secret location reference
+- `.claude/TROUBLESHOOTING.md` - Common issues
+- Root `CLAUDE.md` - Workspace standards
+- Backend `CLAUDE.md` - Django-specific setup
+
+## Success Metrics
+
+- Zero placeholder values in codebase
+- Docker containers start without secret errors
+- New developer onboarding time reduced (clearer docs)
+- No confusion about "where do secrets come from"
+
+## Notes
+
+- This follows Option A from the audit: Pure Runtime Secrets
+- User confirmed preference for "AWS only - load secrets at runtime"
+- Existing `lightwave-aws-cli.py` is already production-ready
+- `.envrc` mechanism already works perfectly

@@ -1,0 +1,409 @@
+name: Sync Agent Context from Notion
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC (10 PM PST / 11 PM PDT)
+    - cron: '0 6 * * *'
+
+  workflow_dispatch:
+    inputs:
+      force_full_sync:
+        description: 'Force full sync (ignore timestamps)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  AWS_REGION: us-east-1
+  NOTION_API_KEY_PARAMETER: /lightwave/prod/NOTION_API_KEY
+  AGENT_DIR: .agent
+
+jobs:
+  sync-notion-to-agent:
+    name: Sync Notion Databases to .agent/
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install notion-client pyyaml python-dateutil
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Retrieve Notion API key from AWS Parameter Store
+        id: get-notion-key
+        run: |
+          NOTION_API_KEY=$(aws ssm get-parameter \
+            --name "${{ env.NOTION_API_KEY_PARAMETER }}" \
+            --with-decryption \
+            --query 'Parameter.Value' \
+            --output text)
+
+          if [ -z "$NOTION_API_KEY" ]; then
+            echo "::error::Failed to retrieve Notion API key from Parameter Store"
+            exit 1
+          fi
+
+          echo "::add-mask::$NOTION_API_KEY"
+          echo "NOTION_API_KEY=$NOTION_API_KEY" >> $GITHUB_ENV
+          echo "✅ Successfully retrieved Notion API key"
+
+      - name: Create sync script
+        run: |
+          cat > sync_notion.py << 'EOF'
+          #!/usr/bin/env python3
+          """
+          Sync Notion databases to .agent/ directory.
+
+          This script syncs metadata from Notion databases to the local .agent/ directory,
+          filtering for Status=Active items only and updating the .last_sync timestamp.
+          """
+
+          import os
+          import sys
+          import json
+          import yaml
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from typing import Dict, List, Any
+          from notion_client import Client
+
+
+          class NotionSyncError(Exception):
+              """Custom exception for Notion sync errors."""
+              pass
+
+
+          class NotionToAgentSync:
+              """Syncs Notion databases to .agent/ directory."""
+
+              def __init__(self, notion_api_key: str, agent_dir: str = ".agent"):
+                  self.client = Client(auth=notion_api_key)
+                  self.agent_dir = Path(agent_dir)
+                  self.metadata_dir = self.agent_dir / "metadata"
+                  self.databases_dir = self.agent_dir / "databases"
+                  self.sync_timestamp = datetime.now(timezone.utc).isoformat()
+
+                  # Create directories if they don't exist
+                  self.metadata_dir.mkdir(parents=True, exist_ok=True)
+                  self.databases_dir.mkdir(parents=True, exist_ok=True)
+
+              def get_database_id_from_config(self, config_file: str = "notion_config.yaml") -> Dict[str, str]:
+                  """Load database IDs from configuration file."""
+                  config_path = self.metadata_dir / config_file
+
+                  if not config_path.exists():
+                      print(f"⚠️ Configuration file not found: {config_path}")
+                      print("ℹ️ Using empty database list")
+                      return {}
+
+                  with open(config_path, 'r') as f:
+                      config = yaml.safe_load(f)
+
+                  return config.get('databases', {})
+
+              def query_database(self, database_id: str, filter_active: bool = True) -> List[Dict[str, Any]]:
+                  """Query Notion database with optional Status=Active filter."""
+                  query_filter = None
+
+                  if filter_active:
+                      query_filter = {
+                          "property": "Status",
+                          "select": {
+                              "equals": "Active"
+                          }
+                      }
+
+                  try:
+                      results = []
+                      has_more = True
+                      start_cursor = None
+
+                      while has_more:
+                          response = self.client.databases.query(
+                              database_id=database_id,
+                              filter=query_filter,
+                              start_cursor=start_cursor
+                          )
+
+                          results.extend(response.get('results', []))
+                          has_more = response.get('has_more', False)
+                          start_cursor = response.get('next_cursor')
+
+                      return results
+
+                  except Exception as e:
+                      raise NotionSyncError(f"Failed to query database {database_id}: {str(e)}")
+
+              def extract_page_properties(self, page: Dict[str, Any]) -> Dict[str, Any]:
+                  """Extract and simplify page properties."""
+                  properties = page.get('properties', {})
+                  extracted = {}
+
+                  for prop_name, prop_value in properties.items():
+                      prop_type = prop_value.get('type')
+
+                      if prop_type == 'title':
+                          title_list = prop_value.get('title', [])
+                          extracted[prop_name] = title_list[0].get('plain_text', '') if title_list else ''
+
+                      elif prop_type == 'rich_text':
+                          text_list = prop_value.get('rich_text', [])
+                          extracted[prop_name] = text_list[0].get('plain_text', '') if text_list else ''
+
+                      elif prop_type == 'select':
+                          select_value = prop_value.get('select')
+                          extracted[prop_name] = select_value.get('name', '') if select_value else ''
+
+                      elif prop_type == 'multi_select':
+                          multi_select_values = prop_value.get('multi_select', [])
+                          extracted[prop_name] = [item.get('name', '') for item in multi_select_values]
+
+                      elif prop_type == 'date':
+                          date_value = prop_value.get('date')
+                          if date_value:
+                              extracted[prop_name] = {
+                                  'start': date_value.get('start'),
+                                  'end': date_value.get('end')
+                              }
+                          else:
+                              extracted[prop_name] = None
+
+                      elif prop_type == 'number':
+                          extracted[prop_name] = prop_value.get('number')
+
+                      elif prop_type == 'checkbox':
+                          extracted[prop_name] = prop_value.get('checkbox', False)
+
+                      elif prop_type == 'url':
+                          extracted[prop_name] = prop_value.get('url', '')
+
+                      elif prop_type == 'email':
+                          extracted[prop_name] = prop_value.get('email', '')
+
+                      elif prop_type == 'phone_number':
+                          extracted[prop_name] = prop_value.get('phone_number', '')
+
+                      else:
+                          # For unsupported types, store raw value
+                          extracted[prop_name] = prop_value
+
+                  # Add page metadata
+                  extracted['_notion_id'] = page.get('id')
+                  extracted['_created_time'] = page.get('created_time')
+                  extracted['_last_edited_time'] = page.get('last_edited_time')
+                  extracted['_url'] = page.get('url')
+
+                  return extracted
+
+              def sync_database(self, database_name: str, database_id: str) -> int:
+                  """Sync a single database to YAML file."""
+                  print(f"Syncing database: {database_name}")
+
+                  # Query database for active items
+                  pages = self.query_database(database_id, filter_active=True)
+                  print(f"  Found {len(pages)} active pages")
+
+                  # Extract properties from each page
+                  extracted_pages = [self.extract_page_properties(page) for page in pages]
+
+                  # Create output structure
+                  output = {
+                      'database_name': database_name,
+                      'database_id': database_id,
+                      'synced_at': self.sync_timestamp,
+                      'filter': 'Status=Active',
+                      'count': len(extracted_pages),
+                      'pages': extracted_pages
+                  }
+
+                  # Write to YAML file
+                  output_file = self.databases_dir / f"{database_name.lower().replace(' ', '_')}.yaml"
+                  with open(output_file, 'w') as f:
+                      yaml.dump(output, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+                  print(f"  ✅ Synced to {output_file}")
+                  return len(extracted_pages)
+
+              def update_last_sync_timestamp(self):
+                  """Update .last_sync file with current timestamp."""
+                  last_sync_file = self.agent_dir / ".last_sync"
+
+                  with open(last_sync_file, 'w') as f:
+                      f.write(f"{self.sync_timestamp}\n")
+
+                  print(f"✅ Updated .last_sync: {self.sync_timestamp}")
+
+              def run(self) -> Dict[str, int]:
+                  """Execute full sync process."""
+                  print("🔄 Starting Notion → .agent/ sync")
+                  print(f"Timestamp: {self.sync_timestamp}")
+                  print("")
+
+                  # Load database configuration
+                  databases = self.get_database_id_from_config()
+
+                  if not databases:
+                      print("⚠️ No databases configured for sync")
+                      return {}
+
+                  # Sync each database
+                  results = {}
+                  total_pages = 0
+
+                  for db_name, db_id in databases.items():
+                      try:
+                          page_count = self.sync_database(db_name, db_id)
+                          results[db_name] = page_count
+                          total_pages += page_count
+                      except Exception as e:
+                          print(f"  ❌ Error syncing {db_name}: {str(e)}")
+                          results[db_name] = 0
+
+                  # Update timestamp
+                  self.update_last_sync_timestamp()
+
+                  print("")
+                  print(f"✅ Sync complete: {total_pages} total pages across {len(databases)} databases")
+
+                  return results
+
+
+          def main():
+              """Main entry point."""
+              notion_api_key = os.getenv('NOTION_API_KEY')
+              agent_dir = os.getenv('AGENT_DIR', '.agent')
+
+              if not notion_api_key:
+                  print("❌ Error: NOTION_API_KEY environment variable not set")
+                  sys.exit(1)
+
+              try:
+                  sync = NotionToAgentSync(notion_api_key, agent_dir)
+                  results = sync.run()
+
+                  # Exit with error if no databases were synced
+                  if not results:
+                      print("⚠️ Warning: No databases were synced")
+                      sys.exit(0)
+
+                  # Exit with error if all syncs failed
+                  if all(count == 0 for count in results.values()):
+                      print("❌ Error: All database syncs failed")
+                      sys.exit(1)
+
+              except Exception as e:
+                  print(f"❌ Fatal error: {str(e)}")
+                  sys.exit(1)
+
+
+          if __name__ == '__main__':
+              main()
+          EOF
+
+          chmod +x sync_notion.py
+
+      - name: Run Notion sync
+        id: sync
+        run: |
+          python sync_notion.py
+
+          # Check if any files were modified
+          if git diff --quiet ${{ env.AGENT_DIR }}; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No changes detected"
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "✅ Changes detected"
+          fi
+
+      - name: Commit and push changes
+        if: steps.sync.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add ${{ env.AGENT_DIR }}
+
+          git commit -m "chore(agent): sync Notion databases to .agent/
+
+          Automated sync of Notion databases to .agent/ directory
+          - Filter: Status=Active only
+          - Timestamp: $(date -u +'%Y-%m-%d %H:%M:%S UTC')
+          - Triggered by: ${{ github.event_name }}
+
+          🤖 Generated with GitHub Actions"
+
+          git push
+
+      - name: Generate sync summary
+        if: always()
+        run: |
+          echo "# 🔄 Notion Sync Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Timestamp:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "**Trigger:** \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Changes Detected:** ${{ steps.sync.outputs.has_changes }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.sync.outputs.has_changes }}" == "true" ]; then
+            echo "## Files Modified" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            git diff --name-only HEAD~1 HEAD >> $GITHUB_STEP_SUMMARY || echo "No changes" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ No changes were necessary - .agent/ is up to date" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Create issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Notion Sync Failed',
+              body: `## Notion Sync Failure
+
+              The automated Notion sync workflow failed.
+
+              **Workflow Run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
+              **Timestamp:** ${new Date().toISOString()}
+              **Trigger:** ${context.eventName}
+
+              ### Possible Causes
+
+              - Notion API key expired or invalid
+              - Network connectivity issues
+              - Database schema changes in Notion
+              - AWS Parameter Store access issues
+
+              ### Action Required
+
+              Please review the workflow logs and resolve the issue.`,
+              labels: ['bug', 'automation', 'notion-sync']
+            });

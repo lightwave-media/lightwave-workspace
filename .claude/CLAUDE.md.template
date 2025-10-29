@@ -1,0 +1,198 @@
+# {REPO_NAME} - Development Guide
+
+**Repository**: {REPO_PATH}
+**Tech Stack**: {TECH_STACK}
+**Purpose**: {PURPOSE}
+
+---
+
+## 🚨 Prerequisites
+
+**Before starting work in this repo:**
+
+- [ ] Read workspace [`.claude/ONBOARDING.md`](../../.claude/ONBOARDING.md)
+- [ ] Check [`.agent/tasks/`](../../.agent/tasks/) for current work
+- [ ] Load secrets from [`.claude/SECRETS_MAP.md`](../../.claude/SECRETS_MAP.md) if needed
+
+---
+
+## 📁 Repository Structure
+
+```
+{REPO_NAME}/
+├── {KEY_FOLDERS}
+└── {MORE_FOLDERS}
+```
+
+**Key Files:**
+- `{FILE_1}` - {DESCRIPTION}
+- `{FILE_2}` - {DESCRIPTION}
+- `{FILE_3}` - {DESCRIPTION}
+
+---
+
+## 🔧 Environment Setup
+
+### Prerequisites
+
+```bash
+# Required tools
+{TOOL_1}
+{TOOL_2}
+{TOOL_3}
+```
+
+### First-Time Setup
+
+```bash
+# Clone repo (if not already cloned)
+cd /Users/joelschaeffer/dev/lightwave/{REPO_PARENT}/
+git clone {REPO_URL}
+cd {REPO_NAME}
+
+# Install dependencies
+{INSTALL_COMMANDS}
+
+# Set up environment
+{ENV_SETUP_COMMANDS}
+
+# Verify setup
+{VERIFY_COMMANDS}
+```
+
+### Environment Variables
+
+**Required Environment Variables:**
+- `{VAR_1}` - {DESCRIPTION} (from `.env.master` or AWS Secrets Manager)
+- `{VAR_2}` - {DESCRIPTION}
+- `{VAR_3}` - {DESCRIPTION}
+
+**Load Secrets:**
+```bash
+# See .claude/SECRETS_MAP.md for detailed instructions
+export AWS_PROFILE=lightwave-admin-new
+export {VAR_1}=$(aws secretsmanager get-secret-value --secret-id {SECRET_ID} --query SecretString --output text)
+```
+
+---
+
+## 🏗️ Development Workflow
+
+### Running Locally
+
+```bash
+# Start development server
+{START_COMMAND}
+
+# Access at
+{LOCAL_URL}
+```
+
+### Common Commands
+
+```bash
+# Run tests
+{TEST_COMMAND}
+
+# Run linter
+{LINT_COMMAND}
+
+# Format code
+{FORMAT_COMMAND}
+
+# Build
+{BUILD_COMMAND}
+```
+
+---
+
+## 🧪 Testing
+
+### Unit Tests
+
+```bash
+{UNIT_TEST_COMMAND}
+```
+
+### Integration Tests
+
+```bash
+{INTEGRATION_TEST_COMMAND}
+```
+
+### Test Coverage
+
+```bash
+{COVERAGE_COMMAND}
+```
+
+---
+
+## 📦 Dependencies
+
+**Key Dependencies:**
+- `{DEPENDENCY_1}` - {PURPOSE}
+- `{DEPENDENCY_2}` - {PURPOSE}
+- `{DEPENDENCY_3}` - {PURPOSE}
+
+**Update Dependencies:**
+```bash
+{UPDATE_COMMAND}
+```
+
+---
+
+## 🚀 Deployment
+
+### Development
+
+```bash
+{DEV_DEPLOY_COMMAND}
+```
+
+### Production
+
+```bash
+{PROD_DEPLOY_COMMAND}
+```
+
+---
+
+## 🔍 Troubleshooting
+
+### Issue: {COMMON_ISSUE_1}
+
+**Solution:**
+```bash
+{SOLUTION_1}
+```
+
+### Issue: {COMMON_ISSUE_2}
+
+**Solution:**
+```bash
+{SOLUTION_2}
+```
+
+**More Issues:**
+See workspace [`.claude/TROUBLESHOOTING.md`](../../.claude/TROUBLESHOOTING.md)
+
+---
+
+## 📚 Additional Resources
+
+- Architecture Docs: `../../.agent/system/`
+- SOPs: `../../.agent/sops/`
+- Task Plans: `../../.agent/tasks/`
+
+---
+
+## 🔗 Related Repos
+
+- {RELATED_REPO_1} - {PURPOSE}
+- {RELATED_REPO_2} - {PURPOSE}
+
+---
+
+**Last Updated**: {DATE}
+**Maintained By**: {MAINTAINER}

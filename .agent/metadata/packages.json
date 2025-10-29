@@ -1,0 +1,220 @@
+{
+  "$schema": "../schemas/packages.schema.json",
+  "version": "1.0.0",
+  "last_updated": "2025-10-25",
+  "registry": "LightWave Shared Packages",
+  "packages": [
+    {
+      "name": "@lightwave/ui",
+      "directory": "lightwave-ui",
+      "location": "Backend/Lightwave-Platform/lightwave-ui",
+      "type": "design-system",
+      "status": "active",
+      "published": true,
+      "npm_version": "0.1.0",
+      "technology": {
+        "framework": "React 19",
+        "styling": "Tailwind CSS v4",
+        "accessibility": "React Aria Components",
+        "animations": "Motion",
+        "bundler": "tsup"
+      },
+      "purpose": "Untitled UI design system - shared component library for all LightWave frontend sites",
+      "provides": [
+        "Base UI components (Button, Input, Select, Checkbox, Badge, Avatar)",
+        "Foundation components (Icons, Social Icons, Payment Icons)",
+        "Marketing components (Header, Footer, Hero, Testimonials, Pricing)",
+        "React hooks (useClipboard, useBreakpoints, etc.)",
+        "Utilities (cx, sortCx, formatDate, etc.)"
+      ],
+      "consumers": [
+        {
+          "site": "lightwave-media.site",
+          "location": "Frontend/lightwave-media-site",
+          "dependency": "workspace:*"
+        },
+        {
+          "site": "joelschaeffer.com",
+          "location": "Frontend/lightwave-joelschaeffer",
+          "dependency": "workspace:*"
+        }
+      ],
+      "build": {
+        "command": "pnpm build",
+        "output": "dist/",
+        "formats": ["cjs", "esm"],
+        "types": "dist/index.d.ts"
+      },
+      "docs": {
+        "readme": "Backend/Lightwave-Platform/lightwave-ui/README.md",
+        "examples": "lightwave-media-site uses adapted components"
+      }
+    },
+    {
+      "name": "@lightwave/auth-client",
+      "directory": "lightwave-auth-client",
+      "location": "Backend/Lightwave-Platform/lightwave-auth-client",
+      "type": "authentication",
+      "status": "not_started",
+      "published": false,
+      "npm_version": null,
+      "technology": {
+        "language": "TypeScript",
+        "framework": "React (hooks)",
+        "bundler": "tsup",
+        "testing": "Vitest"
+      },
+      "purpose": "Thin TypeScript client wrapper around Django authentication endpoints",
+      "provides": [
+        "API client (login, logout, getCurrentUser, isAuthenticated)",
+        "React hooks (useAuth, useUser)",
+        "AuthProvider (React context)",
+        "Custom error classes (InvalidCredentialsError, UnauthorizedError, etc.)",
+        "TypeScript types (User, LoginRequest, LoginResponse)"
+      ],
+      "dependencies": {
+        "backend": {
+          "service": "Django Auth",
+          "domain": "api.lightwave-media.ltd",
+          "endpoints": [
+            "POST /api/auth/login/",
+            "POST /api/auth/logout/",
+            "GET /api/auth/me/"
+          ]
+        }
+      },
+      "consumers": [
+        {
+          "site": "lightwave-media.site",
+          "location": "Frontend/lightwave-media-site",
+          "use_case": "User authentication, login/logout flows"
+        },
+        {
+          "site": "joelschaeffer.com",
+          "location": "Frontend/lightwave-joelschaeffer",
+          "use_case": "User authentication (if needed)"
+        }
+      ],
+      "test_requirements": {
+        "coverage": "100%",
+        "test_files": [
+          "src/__tests__/client.test.ts",
+          "src/__tests__/hooks.test.tsx",
+          "src/__tests__/errors.test.ts"
+        ]
+      },
+      "build": {
+        "command": "pnpm build",
+        "output": "dist/",
+        "formats": ["cjs", "esm"],
+        "types": "dist/index.d.ts"
+      },
+      "docs": {
+        "sop": ".agent/sops/SOP_CREATE_LIGHTWAVE_AUTH_CLIENT.md",
+        "task": ".agent/tasks/auth_client.yaml"
+      }
+    },
+    {
+      "name": "@lightwave/payload-shared",
+      "directory": "lightwave-payload-shared",
+      "location": "Backend/Lightwave-Platform/lightwave-payload-shared",
+      "type": "cms-shared",
+      "status": "not_started",
+      "published": false,
+      "npm_version": null,
+      "technology": {
+        "cms": "Payload CMS 3.59+",
+        "language": "TypeScript",
+        "bundler": "tsup"
+      },
+      "purpose": "Shared Payload CMS collections and blocks used across all frontend sites",
+      "provides": [
+        "Media collection (centralized asset library)",
+        "Users collection (synced from Django)",
+        "Shared blocks (Hero, Content, CallToAction, MediaBlock, Archive)"
+      ],
+      "consumers": [
+        {
+          "site": "lightwave-media.site",
+          "location": "Frontend/lightwave-media-site",
+          "imports": ["Media", "Users", "Shared blocks"]
+        },
+        {
+          "site": "joelschaeffer.com",
+          "location": "Frontend/lightwave-joelschaeffer",
+          "imports": ["Media", "Users", "Shared blocks"]
+        }
+      ],
+      "collections": {
+        "Media": {
+          "purpose": "Centralized media library for all sites",
+          "storage": "Cloudflare R2 or AWS S3",
+          "fields": ["alt", "caption", "site (multi-select)"],
+          "access": {
+            "read": "public",
+            "create": "authenticated",
+            "update": "authenticated",
+            "delete": "admin"
+          }
+        },
+        "Users": {
+          "purpose": "User accounts synced from Django",
+          "source": "Django backend (api.lightwave-media.ltd)",
+          "sync_method": "Django API → Payload API on create/update"
+        }
+      },
+      "blocks": [
+        {
+          "name": "Hero",
+          "fields": ["heading", "subheading", "cta", "backgroundImage"]
+        },
+        {
+          "name": "Content",
+          "fields": ["richText", "layout"]
+        },
+        {
+          "name": "CallToAction",
+          "fields": ["heading", "description", "primaryCTA", "secondaryCTA"]
+        },
+        {
+          "name": "MediaBlock",
+          "fields": ["media", "caption", "position"]
+        },
+        {
+          "name": "Archive",
+          "fields": ["relationTo", "populateBy", "limit"]
+        }
+      ],
+      "test_requirements": {
+        "coverage": "100%",
+        "test_files": [
+          "src/__tests__/Media.test.ts",
+          "src/__tests__/Users.test.ts",
+          "src/__tests__/blocks.test.ts"
+        ]
+      },
+      "build": {
+        "command": "pnpm build",
+        "output": "dist/",
+        "formats": ["cjs", "esm"],
+        "types": "dist/index.d.ts"
+      },
+      "docs": {
+        "sop": ".agent/sops/SOP_CREATE_PAYLOAD_SHARED.md",
+        "task": ".agent/tasks/payload_shared.yaml"
+      }
+    }
+  ],
+  "publishing": {
+    "registry": "npm (private or public)",
+    "workflow": "Local development uses workspace:*, production uses published versions",
+    "versioning": "Semantic versioning (semver)",
+    "release_process": [
+      "1. Update version in package.json",
+      "2. Run pnpm build",
+      "3. Run pnpm test (must pass with 100% coverage)",
+      "4. Run pnpm publish (or npm publish)",
+      "5. Update consumers to new version"
+    ]
+  }
+}

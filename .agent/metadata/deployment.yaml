@@ -1,0 +1,167 @@
+# Deployment Configuration Metadata
+# Version: 1.0.0
+# Last Updated: 2025-10-25
+
+version: "1.0.0"
+last_updated: "2025-10-25"
+
+environments:
+  development:
+    frontend:
+      platform: "local"
+      url: "http://localhost:3000"
+      hot_reload: true
+    
+    backend:
+      platform: "Docker Compose"
+      url: "http://localhost:8000"
+      database: "PostgreSQL (local container)"
+      redis: "Redis (local container)"
+  
+  staging:
+    frontend:
+      platform: "Cloudflare Pages"
+      url: "https://staging.lightwave-media.site"
+      branch: "staging"
+      auto_deploy: true
+    
+    backend:
+      platform: "AWS ECS Fargate"
+      cluster: "lightwave-staging"
+      service: "backend-staging"
+      url: "https://api-staging.lightwave-media.ltd"
+      database: "RDS PostgreSQL (staging)"
+  
+  production:
+    frontend:
+      platform: "Cloudflare Pages"
+      urls:
+        - "https://lightwave-media.site"
+        - "https://joelschaeffer.com"
+      branch: "main"
+      auto_deploy: true
+      preview_deployments: true
+    
+    backend:
+      platform: "AWS ECS Fargate"
+      cluster: "lightwave-prod"
+      service: "backend-prod"
+      url: "https://api.lightwave-media.ltd"
+      database: "RDS PostgreSQL (prod, multi-AZ)"
+      auto_scaling:
+        min: 1
+        max: 5
+        cpu_threshold: 70
+
+cloudflare_pages:
+  framework: "Next.js"
+  build_command: "pnpm build"
+  build_output: ".next"
+  node_version: "18"
+  
+  environment_variables:
+    required:
+      - "PAYLOAD_SECRET"
+      - "DATABASE_URI"
+      - "NEXT_PUBLIC_API_URL"
+    optional:
+      - "NEXT_PUBLIC_ANALYTICS_ID"
+
+aws_ecs:
+  task_definition:
+    cpu: "256"  # 0.25 vCPU
+    memory: "512"  # 512 MB
+    container_port: 8000
+  
+  load_balancer:
+    type: "Application Load Balancer"
+    health_check_path: "/health"
+    health_check_interval: 30
+  
+  auto_scaling:
+    metric: "CPU utilization"
+    target: 70
+    min_tasks: 1
+    max_tasks: 5
+
+ci_cd:
+  platform: "GitHub Actions"
+  
+  on_push:
+    - "Run tests (100% coverage required)"
+    - "Run linting"
+    - "Build Docker image"
+    - "Push to ECR"
+    - "Deploy to ECS"
+  
+  on_pull_request:
+    - "Run tests"
+    - "Run linting"
+    - "Build preview (Cloudflare)"
+    - "Comment PR with preview URL"
+
+dns:
+  provider: "Cloudflare"
+  
+  records:
+    - domain: "lightwave-media.site"
+      type: "CNAME"
+      value: "lightwave-media-site.pages.dev"
+    
+    - domain: "joelschaeffer.com"
+      type: "CNAME"
+      value: "lightwave-joelschaeffer.pages.dev"
+    
+    - domain: "api.lightwave-media.ltd"
+      type: "CNAME"
+      value: "lightwave-prod-alb-xxx.us-east-1.elb.amazonaws.com"
+
+ssl:
+  provider: "Cloudflare"
+  auto_https: true
+  min_tls_version: "1.2"
+  always_use_https: true
+
+monitoring:
+  frontend:
+    - "Cloudflare Analytics"
+    - "Web Vitals"
+  
+  backend:
+    - "AWS CloudWatch"
+    - "ECS Service Metrics"
+    - "RDS Performance Insights"
+  
+  errors:
+    - "Sentry (future)"
+
+backups:
+  database:
+    frequency: "Daily"
+    retention: "30 days"
+    automated: true
+    point_in_time_recovery: true  # production only
+  
+  payload_media:
+    location: "S3"
+    versioning: true
+    lifecycle: "Archive to Glacier after 90 days"
+
+rollback_strategy:
+  frontend:
+    method: "Cloudflare Pages rollback to previous deployment"
+    time: "< 1 minute"
+  
+  backend:
+    method: "ECS task definition rollback"
+    time: "< 5 minutes"
+  
+  database:
+    method: "Point-in-time recovery"
+    time: "< 30 minutes"
+
+related_docs:
+  - ".agent/metadata/tech_stack.yaml"
+  - ".agent/metadata/cloudflare_workers.yaml"
+  - "Infrastructure/lightwave-infrastructure/CLAUDE.md"
+  - "Infrastructure/lightwave-infrastructure-live/CLAUDE.md"

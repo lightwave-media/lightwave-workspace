@@ -1,0 +1,476 @@
+audit_metadata:
+  timestamp: "2025-10-29T02:07:32Z"
+  auditor_version: "1.0"
+  scan_root: "/Users/joelschaeffer/dev/lightwave-workspace"
+  total_files_scanned: 1825
+  total_violations: 12
+  violations_by_severity:
+    critical: 2
+    high: 3
+    medium: 5
+    low: 2
+
+summary:
+  overall_health: "NEEDS_ATTENTION"
+  critical_issues_count: 2
+  most_common_violation: "Missing expected repository clones in Frontend/ and Backend/ directories"
+  domains_audited:
+    - "Workspace Root"
+    - "Frontend (empty)"
+    - "Backend (empty)"
+    - "Infrastructure"
+    - ".claude (context)"
+    - ".agent (metadata)"
+    - ".github (workflows)"
+
+violations:
+  - id: "CRIT-001"
+    severity: "CRITICAL"
+    type: "missing_repositories"
+    current_path: "/Users/joelschaeffer/dev/lightwave-workspace/Frontend/"
+    expected_path: "/Users/joelschaeffer/dev/lightwave-workspace/Frontend/{repo-name}/"
+    rule_violated: "CLAUDE.md Section: Workspace Structure - Frontend repositories must be cloned"
+    description: "Frontend/ directory is completely empty. Expected repositories not cloned."
+    impact: "No frontend repositories available for development. All frontend work is blocked."
+    recommended_action: |
+      Clone expected frontend repositories:
+      - lightwave-cineos (cineos.io)
+      - lightwave-createos (createos.io)
+      - lightwave-photographos (photographyos.io)
+      - lightwave-joelschaeffer (joelschaeffer.com)
+      - lightwave-media-site (lightwave-media.site)
+    file_metadata:
+      extension: null
+      size_bytes: 64
+      last_modified: "2025-10-28T18:39:00Z"
+
+  - id: "CRIT-002"
+    severity: "CRITICAL"
+    type: "missing_repositories"
+    current_path: "/Users/joelschaeffer/dev/lightwave-workspace/Backend/"
+    expected_path: "/Users/joelschaeffer/dev/lightwave-workspace/Backend/{repo-name}/"
+    rule_violated: "CLAUDE.md Section: Workspace Structure - Backend repositories must be cloned"
+    description: "Backend/ directory is completely empty. Expected repositories not cloned."
+    impact: "No backend repositories available for development. All backend API work is blocked."
+    recommended_action: |
+      Clone expected backend repository:
+      - lightwave-backend (api.lightwave-media.ltd)
+      Navigate to Backend/ and run:
+      git clone git@github.com:lightwave-media/lightwave-backend.git
+    file_metadata:
+      extension: null
+      size_bytes: 64
+      last_modified: "2025-10-28T18:39:00Z"
+
+  - id: "HIGH-001"
+    severity: "HIGH"
+    type: "uncommitted_changes"
+    current_path: "/Users/joelschaeffer/dev/lightwave-workspace/"
+    expected_path: null
+    rule_violated: "Git Workflow - All workspace-level changes should be committed"
+    description: "Workspace root has uncommitted changes including core documentation files"
+    impact: "Context files (.claude/, .agent/) are not version controlled, risking loss of configuration"
+    recommended_action: |
+      Review and commit workspace-level changes:
+      git status
+      git add .agent/ .claude/ .github/ .gitignore CLAUDE.md README.md
+      git commit -m "docs: update workspace context and documentation"
+    file_metadata:
+      extension: null
+      size_bytes: null
+      last_modified: null
+
+  - id: "HIGH-002"
+    severity: "HIGH"
+    type: "uncommitted_changes"
+    current_path: "/Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/"
+    expected_path: null
+    rule_violated: "Git Workflow - Infrastructure changes should be committed"
+    description: "Infrastructure catalog has extensive uncommitted changes (new modules, units, stacks)"
+    impact: "Critical infrastructure code (Django Fargate, PostgreSQL, Redis modules) is not tracked"
+    recommended_action: |
+      Navigate to Infrastructure/lightwave-infrastructure-catalog/ and review changes:
+      git status
+      git add modules/django-fargate-service/ units/django-fargate-stateful-service/ stacks/django-backend-prod/
+      git commit -m "feat(infra): add Django Fargate deployment infrastructure"
+    file_metadata:
+      extension: null
+      size_bytes: null
+      last_modified: null
+
+  - id: "HIGH-003"
+    severity: "HIGH"
+    type: "missing_documentation"
+    current_path: "/Users/joelschaeffer/dev/lightwave-workspace/.claude/workflows/"
+    expected_path: null
+    rule_violated: "CLAUDE.md Section: Documentation Navigation Guide - workflow files expected"
+    description: "Workflows directory is empty. Referenced in CLAUDE.md but no workflow files present."
+    impact: "Missing workflow documentation referenced in navigation guide (DECISION_TREES.md, CHECKLISTS.md, COMMANDS.md, etc.)"
+    recommended_action: |
+      Create expected workflow documentation files:
+      - .claude/workflows/DECISION_TREES.md (workflow guides)
+      - .claude/workflows/CHECKLISTS.md (DoR/DoD, daily routines)
+      - .claude/workflows/COMMANDS.md (common commands)
+      - .claude/workflows/AGENT_PLAYBOOK.md (agent workflows)
+      Or update CLAUDE.md to remove references to non-existent files.
+    file_metadata:
+      extension: null
+      size_bytes: 64
+      last_modified: null
+
+  - id: "MED-001"
+    severity: "MEDIUM"
+    type: "missing_documentation"
+    current_path: "/Users/joelschaeffer/dev/lightwave-workspace/.claude/reference/"
+    expected_path: null
+    rule_violated: "CLAUDE.md Section: Documentation Navigation Guide - reference files expected"
+    description: "Reference directory only contains 2 of 4 expected files"
+    impact: "Missing GLOSSARY.md and MCP_TOOLS.md referenced in navigation guide"
+    recommended_action: |
+      Create missing reference documentation:
+      - .claude/reference/GLOSSARY.md (terminology definitions)
+      - .claude/reference/MCP_TOOLS.md (MCP tool usage patterns)
+      Or update CLAUDE.md navigation table to remove references.
+    file_metadata:
+      extension: null
+      size_bytes: null
+      last_modified: null
+
+  - id: "MED-002"
+    severity: "MEDIUM"
+    type: "missing_documentation"
+    current_path: "/Users/joelschaeffer/dev/lightwave-workspace/.claude/skills/"
+    expected_path: null
+    rule_violated: "CLAUDE.md Section: Quick Start - skills expected"
+    description: "Skills directory only contains onboarding.md, missing 3 other referenced skills"
+    impact: "Missing skill files: secrets-loader.md, task-workflow.md, troubleshooter.md"
+    recommended_action: |
+      Create missing skill workflow files:
+      - .claude/skills/secrets-loader.md (credential loading workflow)
+      - .claude/skills/task-workflow.md (TDD feature implementation)
+      - .claude/skills/troubleshooter.md (issue diagnosis workflow)
+      Or update CLAUDE.md to reflect actual skills available.
+    file_metadata:
+      extension: null
+      size_bytes: null
+      last_modified: null
+
+  - id: "MED-003"
+    severity: "MEDIUM"
+    type: "missing_documentation"
+    current_path: "/Users/joelschaeffer/dev/lightwave-workspace/.claude/architecture/"
+    expected_path: null
+    rule_violated: "CLAUDE.md Section: Documentation Navigation Guide - architecture files expected"
+    description: "Architecture directory is empty but referenced in navigation (DECISIONS.md expected)"
+    impact: "Missing architecture decision records referenced in navigation guide"
+    recommended_action: |
+      Create architecture documentation:
+      - .claude/architecture/DECISIONS.md (ADRs - Architecture Decision Records)
+      Or update CLAUDE.md navigation table to remove reference.
+    file_metadata:
+      extension: null
+      size_bytes: 64
+      last_modified: null
+
+  - id: "MED-004"
+    severity: "MEDIUM"
+    type: "missing_documentation"
+    current_path: "/Users/joelschaeffer/dev/lightwave-workspace/.claude/meta/"
+    expected_path: null
+    rule_violated: "Directory Structure - Purpose unclear"
+    description: "Meta directory exists but is empty and not referenced in CLAUDE.md"
+    impact: "Unclear purpose, potential confusion for developers"
+    recommended_action: |
+      Either:
+      1. Add README.md explaining purpose of .claude/meta/
+      2. Remove directory if unused
+      3. Add reference to CLAUDE.md if intentional
+    file_metadata:
+      extension: null
+      size_bytes: 64
+      last_modified: null
+
+  - id: "MED-005"
+    severity: "MEDIUM"
+    type: "large_binary_files"
+    current_path: "/Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/"
+    expected_path: null
+    rule_violated: "Git Best Practices - Large binary files should not be committed"
+    description: "Multiple Terraform provider binaries (>1MB each) present in .terraform/ directories"
+    impact: "Bloats git repository size, slows clone/fetch operations"
+    recommended_action: |
+      Ensure .terraform/ directories are properly gitignored.
+      Add to .gitignore if not present:
+      **/.terraform/*
+      *.tfstate
+      *.tfstate.backup
+      These are generated files and should not be committed.
+    file_metadata:
+      extension: ".terraform"
+      size_bytes: null
+      last_modified: null
+
+  - id: "LOW-001"
+    severity: "LOW"
+    type: "documentation_staleness"
+    current_path: "/Users/joelschaeffer/dev/lightwave-workspace/.agent/metadata/.last_sync"
+    expected_path: null
+    rule_violated: "Context System - Regular sync expected"
+    description: "Last sync timestamp is from Oct 28 11:40:28 2025 (15+ hours ago)"
+    impact: "Metadata may be stale if Notion has been updated since last sync"
+    recommended_action: |
+      Consider running GitHub Actions workflow to sync agent context:
+      gh workflow run sync-agent-context.yml
+      Or document expected sync frequency in documentation.
+    file_metadata:
+      extension: null
+      size_bytes: null
+      last_modified: "2025-10-28T18:40:28Z"
+
+  - id: "LOW-002"
+    severity: "LOW"
+    type: "naming_inconsistency"
+    current_path: "/Users/joelschaeffer/dev/lightwave-workspace/.claude/archive/"
+    expected_path: null
+    rule_violated: "Naming Conventions - Consistent naming expected"
+    description: "Both .claude/archive/ and .agent/archive/ exist, unclear distinction"
+    impact: "Minor confusion about where to archive different types of files"
+    recommended_action: |
+      Document in README or ONBOARDING:
+      - .claude/archive/ purpose: [define purpose]
+      - .agent/archive/ purpose: [define purpose]
+      Or consolidate if redundant.
+    file_metadata:
+      extension: null
+      size_bytes: null
+      last_modified: null
+
+  - id: "INFO-001"
+    severity: "LOW"
+    type: "information"
+    current_path: "/Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-live/"
+    expected_path: null
+    rule_violated: "N/A - Information only"
+    description: "Minor uncommitted changes in terragrunt.stack.hcl files for stateful-ec2-asg-service"
+    impact: "Minimal - appears to be configuration updates"
+    recommended_action: |
+      Review and commit changes:
+      git diff non-prod/us-east-1/stateful-ec2-asg-service/terragrunt.stack.hcl
+      git diff prod/us-east-1/stateful-ec2-asg-service/terragrunt.stack.hcl
+      If intentional, commit with descriptive message.
+    file_metadata:
+      extension: ".hcl"
+      size_bytes: null
+      last_modified: null
+
+recommendations:
+  - priority: "HIGH"
+    category: "repository_setup"
+    description: |
+      Clone all expected repositories to complete workspace structure.
+      This is blocking all development work in Frontend and Backend.
+    estimated_effort: "30 minutes"
+    automation_potential: "HIGH"
+    implementation: |
+      Create a setup script (.claude/scripts/clone-repos.sh) that clones all repositories:
+
+      #!/bin/bash
+      cd /Users/joelschaeffer/dev/lightwave-workspace
+
+      # Frontend repos
+      cd Frontend/
+      git clone git@github.com:lightwave-media/lightwave-cineos.git
+      git clone git@github.com:lightwave-media/lightwave-createos.git
+      git clone git@github.com:lightwave-media/lightwave-photographos.git
+      git clone git@github.com:lightwave-media/lightwave-joelschaeffer.git
+      git clone git@github.com:lightwave-media/lightwave-media-site.git
+
+      # Backend repos
+      cd ../Backend/
+      git clone git@github.com:lightwave-media/lightwave-backend.git
+
+  - priority: "HIGH"
+    category: "documentation_completion"
+    description: |
+      Complete missing documentation files referenced in CLAUDE.md navigation guide.
+      This prevents confusion and ensures all documented resources actually exist.
+    estimated_effort: "2-4 hours"
+    automation_potential: "MEDIUM"
+    implementation: |
+      Priority order:
+      1. .claude/reference/MCP_TOOLS.md (critical for agent operations)
+      2. .claude/workflows/CHECKLISTS.md (DoR/DoD)
+      3. .claude/workflows/DECISION_TREES.md (workflow guides)
+      4. .claude/workflows/COMMANDS.md (common commands)
+      5. .claude/skills/secrets-loader.md, task-workflow.md, troubleshooter.md
+      6. .claude/architecture/DECISIONS.md (ADRs)
+      7. .claude/reference/GLOSSARY.md (terminology)
+
+  - priority: "HIGH"
+    category: "version_control"
+    description: |
+      Commit all outstanding changes across workspace and infrastructure repositories.
+      This ensures work is tracked and backed up.
+    estimated_effort: "45 minutes"
+    automation_potential: "LOW"
+    implementation: |
+      Review and commit in this order:
+      1. Workspace root (.agent/, .claude/, documentation)
+      2. Infrastructure catalog (new modules and units)
+      3. Infrastructure live (terragrunt config updates)
+
+  - priority: "MEDIUM"
+    category: "gitignore_optimization"
+    description: |
+      Ensure all infrastructure repos have proper .gitignore for Terraform files.
+      Prevents bloat from binary provider files.
+    estimated_effort: "15 minutes"
+    automation_potential: "HIGH"
+    implementation: |
+      Add to lightwave-infrastructure-catalog/.gitignore:
+      **/.terraform/*
+      **/.terragrunt-cache/*
+      *.tfstate
+      *.tfstate.backup
+      .terraform.lock.hcl
+
+  - priority: "MEDIUM"
+    category: "documentation_accuracy"
+    description: |
+      Audit CLAUDE.md for references to non-existent files and either create files or remove references.
+      Ensures documentation reflects reality.
+    estimated_effort: "1 hour"
+    automation_potential: "LOW"
+    implementation: |
+      Compare CLAUDE.md navigation table with actual filesystem:
+      - Create missing files OR
+      - Update navigation table to remove dead links
+      Document decision in changelog.
+
+  - priority: "LOW"
+    category: "metadata_sync"
+    description: |
+      Establish and document expected sync frequency for .agent/ metadata.
+      Ensures context stays fresh.
+    estimated_effort: "30 minutes"
+    automation_potential: "HIGH"
+    implementation: |
+      Options:
+      1. Manual sync on-demand via GitHub Actions
+      2. Scheduled sync (daily/weekly via cron)
+      3. Webhook-triggered sync on Notion updates
+      Document chosen approach in .agent/README.md
+
+  - priority: "LOW"
+    category: "directory_cleanup"
+    description: |
+      Clarify or consolidate archive directories (.claude/archive vs .agent/archive).
+      Reduces confusion about archival strategy.
+    estimated_effort: "20 minutes"
+    automation_potential: "NONE"
+    implementation: |
+      Recommend:
+      - .claude/archive/ = Archived context/workflow docs
+      - .agent/archive/ = Archived tasks and implementation plans
+      Document in .claude/README.md
+
+statistics:
+  git_repositories:
+    workspace_root: "initialized (main branch)"
+    infrastructure_catalog: "initialized (uncommitted changes)"
+    infrastructure_live: "initialized (minor uncommitted changes)"
+    frontend_repos: "NONE (empty directory)"
+    backend_repos: "NONE (empty directory)"
+
+  files_by_type:
+    markdown: 328
+    yaml: 40
+    json: 24
+    total: 1825
+
+  context_directories:
+    ".claude": "148K (14 items)"
+    ".agent": "508K (14 items)"
+    ".github": "48K (workflows)"
+
+  documentation_coverage:
+    workspace_root: "COMPLETE (CLAUDE.md, README.md present)"
+    claude_context: "INCOMPLETE (missing workflows/, reference/ files)"
+    agent_metadata: "COMPLETE (all expected metadata files present)"
+    infrastructure_catalog: "COMPLETE (README.md, implementation guides present)"
+    infrastructure_live: "COMPLETE (README.md present)"
+    frontend_repos: "N/A (no repos cloned)"
+    backend_repos: "N/A (no repos cloned)"
+
+  infrastructure_structure:
+    catalog_modules: 14
+    catalog_units: 17
+    catalog_stacks: 2
+    live_environments: 2
+    terragrunt_files: "multiple (prod + non-prod)"
+
+  github_actions:
+    workspace_workflows: 3
+    workflows_present:
+      - "emergency-shutdown.yml"
+      - "sync-agent-context.yml"
+      - "validate-structure.yml"
+
+health_indicators:
+  positive:
+    - "Workspace git repository properly initialized"
+    - "Context system (.claude/ and .agent/) well-structured"
+    - "Infrastructure repositories cloned and organized"
+    - "Comprehensive metadata files present in .agent/"
+    - "GitHub Actions workflows configured for automation"
+    - "Clear separation between catalog and live infrastructure"
+    - "Agent system documentation present"
+
+  negative:
+    - "CRITICAL: No frontend repositories cloned"
+    - "CRITICAL: No backend repositories cloned"
+    - "HIGH: Extensive uncommitted changes in workspace root"
+    - "HIGH: Extensive uncommitted changes in infrastructure catalog"
+    - "HIGH: Missing workflow documentation files"
+    - "MEDIUM: Incomplete .claude/reference/ directory"
+    - "MEDIUM: Incomplete .claude/skills/ directory"
+    - "MEDIUM: Large Terraform binaries not properly gitignored"
+
+next_actions:
+  immediate:
+    - "Clone all frontend repositories to Frontend/"
+    - "Clone backend repository to Backend/"
+    - "Commit workspace-level changes (.agent/, .claude/)"
+
+  short_term:
+    - "Create missing workflow documentation files"
+    - "Complete .claude/skills/ directory"
+    - "Commit infrastructure catalog changes"
+    - "Optimize .gitignore for Terraform files"
+
+  long_term:
+    - "Establish metadata sync schedule"
+    - "Create repository setup automation script"
+    - "Document archive directory purposes"
+    - "Regular audit schedule (monthly)"
+
+compliance_summary:
+  lightwave_filesystem_spec: "N/A - This audit focuses on workspace structure, not Life Domain organization"
+  workspace_structure_spec: "PARTIAL - Core structure present but missing repository clones"
+  git_workflow_spec: "PARTIAL - Repositories initialized but uncommitted changes present"
+  documentation_standards: "INCOMPLETE - Many referenced files missing"
+
+audit_scope_notes: |
+  This audit focused on the lightwave-workspace multi-repository structure itself,
+  not the LightWave Filesystem Organization Specification for Life Domains.
+
+  The workspace is a development environment for code repositories, not file storage
+  for cinematography/photography/product development domains.
+
+  Future audits may need to:
+  1. Audit individual repositories once cloned (Backend/, Frontend/*)
+  2. Verify Life Domain structure in Joel's home directory (/Users/joel/)
+  3. Check staging folder compliance (00-STAGING/)
+
+  This audit provides a baseline for workspace health and identifies critical
+  blockers (missing repositories) that prevent development work.
