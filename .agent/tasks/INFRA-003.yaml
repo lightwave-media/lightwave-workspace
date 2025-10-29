@@ -1,0 +1,80 @@
+id: INFRA-003
+title: Create Infrastructure CI/CD Pipeline with Automated Plan/Apply
+description: |
+  Currently, infrastructure deployments rely on manual execution via Makefile. There's no
+  GitHub Actions workflow for infrastructure changes, meaning:
+  - No automated terragrunt plan on PRs (engineers can't see changes before merge)
+  - No automated terragrunt apply on merge to main
+  - No deployment approval gates
+  - No infrastructure test environment for validating changes
+
+  This task creates a full CI/CD pipeline following Gruntwork best practices:
+  - PR: Run terragrunt plan, post plan output as comment
+  - Merge to main: Run terragrunt apply with approval gate for prod
+  - Separate workflows for non-prod (auto-apply) vs prod (manual approval)
+  - Integration with AWS OIDC for secure credential management
+
+status: Active
+priority: high
+estimated_effort: 12 hours
+tags:
+  - infrastructure
+  - ci-cd
+  - github-actions
+  - automation
+
+owner: Platform Team
+
+acceptance_criteria:
+  - GitHub Actions workflow created .github/workflows/terragrunt-plan.yml
+  - GitHub Actions workflow created .github/workflows/terragrunt-apply.yml
+  - AWS OIDC provider configured for GitHub Actions authentication
+  - Plan output posted as PR comment with formatted diff
+  - Production deployments require manual approval
+  - Non-prod deployments auto-apply after plan approval
+  - Workflow tested with sample infrastructure change
+
+related_sops:
+  - SOP_INFRASTRUCTURE_DEPLOYMENT.md
+
+related_files:
+  - .github/workflows/
+
+risks_if_not_done:
+  - No visibility into infrastructure changes before deployment
+  - Accidental production deployments without review
+  - Longer deployment cycles due to manual process
+  - Inconsistent deployment procedures across team
+
+dependencies:
+  - INFRA-002
+
+subtasks:
+  - title: Configure AWS OIDC provider for GitHub Actions
+    status: pending
+  - title: Create IAM role for GitHub Actions with least privilege
+    status: pending
+  - title: Create terragrunt-plan.yml workflow
+    status: pending
+  - title: Create terragrunt-apply.yml workflow
+    status: pending
+  - title: Implement plan output formatting and PR comments
+    status: pending
+  - title: Add manual approval gate for production deployments
+    status: pending
+  - title: Configure auto-apply for non-prod environments
+    status: pending
+  - title: Test workflow with sample infrastructure change
+    status: pending
+  - title: Document workflow in README.md
+    status: pending
+
+notes: |
+  OIDC provider setup guide:
+  https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services
+
+  Example Terragrunt GitHub Actions:
+  https://github.com/gruntwork-io/terragrunt-action
+
+created_at: 2025-10-28
+updated_at: 2025-10-28

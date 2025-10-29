@@ -1,0 +1,88 @@
+id: INFRA-006
+title: Establish Cost Monitoring & Alerting System
+description: |
+  Emergency shutdown workflow exists (.github/workflows/emergency-shutdown.yml) indicating
+  cost concerns, but there's no proactive cost monitoring:
+  - No AWS Cost Explorer alerts configured
+  - No budget alerts for unexpected spend
+  - No tagging strategy for cost allocation
+  - No cost estimation in CI/CD pipeline (see INFRA-002)
+  - No monthly cost review process
+
+  This task implements comprehensive cost management to prevent emergency shutdowns.
+
+status: Active
+priority: medium
+estimated_effort: 8 hours
+tags:
+  - infrastructure
+  - cost-management
+  - aws-budgets
+  - operations
+
+owner: Platform Team / Finance
+
+acceptance_criteria:
+  - AWS Budgets configured for each environment (dev $50/mo, staging $100/mo, prod $500/mo)
+  - SNS topic created for budget alerts with email subscriptions
+  - Cost allocation tags standardized across all resources
+  - Terraform module created for budget management
+  - Monthly cost review template created
+  - Cost optimization opportunities documented (RDS reserved instances, etc.)
+  - Dashboard created in AWS Cost Explorer with saved filters
+
+related_sops:
+  - SOP_COST_MANAGEMENT.md
+
+related_files:
+  - .github/workflows/emergency-shutdown.yml
+  - Infrastructure/lightwave-infrastructure-live/root.hcl
+
+risks_if_not_done:
+  - Unexpected AWS bills without warning
+  - No visibility into cost trends
+  - Emergency shutdowns required for cost control
+  - No accountability for resource costs
+
+dependencies:
+  - INFRA-002
+
+subtasks:
+  - title: Define cost allocation tagging strategy
+    status: pending
+  - title: Create Terraform module for AWS Budgets
+    status: pending
+  - title: Configure budgets for dev environment
+    status: pending
+  - title: Configure budgets for staging environment
+    status: pending
+  - title: Configure budgets for prod environment
+    status: pending
+  - title: Set up SNS topics for budget alerts
+    status: pending
+  - title: Create monthly cost review template
+    status: pending
+  - title: Document cost optimization opportunities
+    status: pending
+  - title: Create Cost Explorer saved reports
+    status: pending
+  - title: Schedule first monthly cost review meeting
+    status: pending
+
+notes: |
+  SOP has been created at `.agent/sops/SOP_COST_MANAGEMENT.md`
+
+  Budget thresholds:
+  - 80%: Email alert
+  - 100%: Email + Slack alert
+  - 150%: Trigger emergency shutdown (dev only)
+
+  Cost allocation tags:
+  - Environment (dev/staging/prod)
+  - ManagedBy (Terragrunt/Manual)
+  - Owner (team name)
+  - CostCenter (department)
+  - Project (project name)
+
+created_at: 2025-10-28
+updated_at: 2025-10-28

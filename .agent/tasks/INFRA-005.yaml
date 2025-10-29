@@ -1,0 +1,82 @@
+id: INFRA-005
+title: Create Disaster Recovery Testing & Runbook
+description: |
+  deployment.yaml (line 139-161) mentions backup strategy (daily RDS, 30-day retention,
+  point-in-time recovery) but there's NO documented procedure for:
+  - How to actually perform a restore from backup
+  - RTO/RPO targets and verification
+  - Full stack disaster recovery (database + infrastructure + application state)
+  - Disaster recovery testing schedule
+  - Communication plan during incidents
+
+  This task creates comprehensive DR documentation and establishes regular DR testing.
+
+status: Active
+priority: high
+estimated_effort: 16 hours
+tags:
+  - infrastructure
+  - disaster-recovery
+  - operations
+  - sop
+
+owner: Platform Team
+
+acceptance_criteria:
+  - SOP created with step-by-step RDS restore procedure
+  - SOP created with full stack recovery procedure (infrastructure → database → app)
+  - RTO/RPO documented for each environment (dev 4hrs, staging 2hrs, prod 30min)
+  - Disaster recovery test performed in non-prod and documented
+  - Runbook created for common disaster scenarios (data loss, region failure, etc.)
+  - Communication templates created (incident notification, status updates)
+  - DR testing schedule established (quarterly for prod, bi-annually for non-prod)
+
+related_sops:
+  - SOP_DISASTER_RECOVERY.md
+  - SOP_INFRASTRUCTURE_DEPLOYMENT.md
+
+related_files:
+  - .agent/metadata/deployment.yaml
+
+risks_if_not_done:
+  - Unknown recovery time if disaster occurs
+  - Untested backup restoration may fail when needed
+  - No clear communication plan during incident
+  - Potential data loss beyond acceptable RPO
+
+dependencies: []
+
+subtasks:
+  - title: Define RTO/RPO targets for each environment
+    status: pending
+  - title: Document RDS point-in-time recovery procedure
+    status: pending
+  - title: Document full stack recovery procedure
+    status: pending
+  - title: Create runbook for data loss scenario
+    status: pending
+  - title: Create runbook for region outage scenario
+    status: pending
+  - title: Create runbook for infrastructure destruction scenario
+    status: pending
+  - title: Create incident communication templates
+    status: pending
+  - title: Perform test restore in dev environment
+    status: pending
+  - title: Document DR testing schedule
+    status: pending
+  - title: Create DR testing checklist
+    status: pending
+
+notes: |
+  SOP has been created at `.agent/sops/SOP_DISASTER_RECOVERY.md`
+
+  RTO/RPO targets:
+  - Development: RTO 8hrs, RPO 24hrs
+  - Staging: RTO 2hrs, RPO 4hrs
+  - Production: RTO 30min, RPO 5min
+
+  Schedule quarterly DR tests during low-traffic windows
+
+created_at: 2025-10-28
+updated_at: 2025-10-28

@@ -1,0 +1,70 @@
+id: INFRA-001
+title: Implement Terragrunt Remote State Verification & Recovery SOP
+description: |
+  Remote state is configured in S3 with DynamoDB locking (root.hcl:44-58), but there's no
+  documented procedure for verifying state integrity, handling corrupted state, or recovering
+  from state lock failures. This is a critical operational gap that will cause deployment
+  failures without clear remediation paths.
+
+  The task involves:
+  - Creating verification scripts to check S3 bucket access and DynamoDB table status
+  - Documenting state lock troubleshooting (when "Error acquiring the state lock" occurs)
+  - Writing recovery procedures for corrupted state files
+  - Establishing backup/restore procedures for critical state files
+  - Creating pre-flight checks that run before every terragrunt apply
+
+status: Active
+priority: critical
+estimated_effort: 8 hours
+tags:
+  - infrastructure
+  - terragrunt
+  - operations
+  - sop
+
+owner: Platform Team
+
+acceptance_criteria:
+  - SOP document created with step-by-step verification procedures
+  - Shell script created scripts/verify-remote-state.sh with exit codes
+  - Recovery procedures tested in non-prod environment
+  - Pre-flight checks integrated into Makefile targets
+  - Documentation includes examples of common failure scenarios and fixes
+
+related_sops:
+  - SOP_REMOTE_STATE_MANAGEMENT.md
+
+related_files:
+  - Infrastructure/lightwave-infrastructure-live/root.hcl
+  - Infrastructure/lightwave-infrastructure-live/Makefile
+
+risks_if_not_done:
+  - Deployments fail with cryptic state lock errors
+  - Engineers manually delete locks without understanding impact
+  - Corrupted state causes unintended resource destruction
+  - Multi-hour debugging sessions for preventable issues
+
+dependencies: []
+
+subtasks:
+  - title: Review existing remote state configuration
+    status: pending
+  - title: Create verify-remote-state.sh script
+    status: pending
+  - title: Document state lock troubleshooting procedures
+    status: pending
+  - title: Write state corruption recovery procedures
+    status: pending
+  - title: Test recovery procedures in dev environment
+    status: pending
+  - title: Integrate pre-flight checks into Makefile
+    status: pending
+  - title: Create examples of common failure scenarios
+    status: pending
+
+notes: |
+  SOP has been created at `.agent/sops/SOP_REMOTE_STATE_MANAGEMENT.md`
+  Next step: Create automation scripts and integrate into deployment workflow
+
+created_at: 2025-10-28
+updated_at: 2025-10-28

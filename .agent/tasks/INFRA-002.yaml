@@ -1,0 +1,71 @@
+id: INFRA-002
+title: Enhance Pre-Commit Hooks with Security & Compliance Checks
+description: |
+  Current pre-commit hooks (.pre-commit-config.yaml) include basic formatting and validation
+  (terraform-fmt, terragrunt-hclfmt, tflint), but lack critical security checks:
+  - No secret scanning (detect AWS keys, passwords in code)
+  - No cost estimation (terraform-cost or infracost)
+  - No compliance checks (AWS security group rules, IAM overpermissive policies)
+  - No Terragrunt dependency validation
+  - No drift detection reminders
+
+  This creates risk of committing security issues or costly misconfigurations.
+
+status: Active
+priority: high
+estimated_effort: 6 hours
+tags:
+  - infrastructure
+  - security
+  - compliance
+  - pre-commit
+
+owner: Platform Team
+
+acceptance_criteria:
+  - Pre-commit hooks updated with detect-secrets or trufflehog
+  - tflint configured with AWS ruleset for security best practices
+  - Infracost integration added (or cost estimation script)
+  - Custom hook added to validate Terragrunt dependency chains
+  - Pre-commit runs successfully on sample infrastructure code
+  - Documentation updated in README.md with new hook descriptions
+
+related_sops:
+  - SOP_INFRASTRUCTURE_DEPLOYMENT.md
+
+related_files:
+  - Infrastructure/lightwave-infrastructure-catalog/.pre-commit-config.yaml
+  - Infrastructure/lightwave-infrastructure-live/.pre-commit-config.yaml
+
+risks_if_not_done:
+  - AWS credentials accidentally committed to Git
+  - Security group rules open to 0.0.0.0/0 without review
+  - Unexpected AWS costs from oversized resources
+  - Broken Terragrunt dependencies cause partial deployments
+
+dependencies: []
+
+subtasks:
+  - title: Research and select secret scanning tool (detect-secrets vs trufflehog)
+    status: pending
+  - title: Add secret scanning hook to .pre-commit-config.yaml
+    status: pending
+  - title: Configure tflint with AWS security ruleset
+    status: pending
+  - title: Integrate Infracost for cost estimation
+    status: pending
+  - title: Create custom hook for Terragrunt dependency validation
+    status: pending
+  - title: Test pre-commit hooks on sample code
+    status: pending
+  - title: Update documentation with hook descriptions
+    status: pending
+
+notes: |
+  Consider using:
+  - detect-secrets: Faster, fewer false positives
+  - tflint AWS ruleset: github.com/terraform-linters/tflint-ruleset-aws
+  - Infracost: Free tier available, integrates with CI/CD
+
+created_at: 2025-10-28
+updated_at: 2025-10-28

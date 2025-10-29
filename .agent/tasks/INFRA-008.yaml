@@ -1,0 +1,80 @@
+id: INFRA-008
+title: Create Infrastructure Testing Framework with Terratest
+description: |
+  Infrastructure modules in lightwave-infrastructure-catalog have no automated tests:
+  - No validation that modules work as expected
+  - No regression testing when modules are updated
+  - No integration tests for module combinations
+  - Module changes risk breaking downstream dependencies
+
+  Gruntwork recommends Terratest for infrastructure testing. This task establishes
+  comprehensive testing for all infrastructure modules.
+
+status: Active
+priority: medium
+estimated_effort: 20 hours
+tags:
+  - infrastructure
+  - testing
+  - terratest
+  - quality-assurance
+
+owner: Platform Team
+
+acceptance_criteria:
+  - Terratest framework set up in lightwave-infrastructure-catalog
+  - Example tests created for 3 core modules (ECS, RDS, Redis)
+  - Tests verify resources are created correctly
+  - Tests verify resources are destroyed cleanly
+  - CI/CD pipeline runs tests on PR
+  - Test coverage documented for each module
+  - Test writing guide created for future modules
+
+related_sops:
+  - SOP_INFRASTRUCTURE_DEPLOYMENT.md
+
+related_files:
+  - Infrastructure/lightwave-infrastructure-catalog/
+
+risks_if_not_done:
+  - Module changes break production without detection
+  - No confidence in infrastructure changes
+  - Manual testing required for every change
+  - Regressions introduced in module updates
+
+dependencies:
+  - INFRA-003
+
+subtasks:
+  - title: Set up Terratest framework in infrastructure-catalog
+    status: pending
+  - title: Create test for ECS module
+    status: pending
+  - title: Create test for RDS module
+    status: pending
+  - title: Create test for Redis module
+    status: pending
+  - title: Integrate tests into GitHub Actions workflow
+    status: pending
+  - title: Document test coverage for each module
+    status: pending
+  - title: Create test writing guide
+    status: pending
+  - title: Run tests on sample module changes
+    status: pending
+
+notes: |
+  Terratest resources:
+  - https://terratest.gruntwork.io/
+  - https://github.com/gruntwork-io/terratest
+
+  Test pattern:
+  1. Deploy infrastructure using terraform.Init and terraform.Apply
+  2. Validate infrastructure (check outputs, query AWS)
+  3. Destroy infrastructure using terraform.Destroy
+  4. Validate cleanup (ensure resources deleted)
+
+  Run tests in isolated AWS account to prevent conflicts
+
+created_at: 2025-10-28
+updated_at: 2025-10-28

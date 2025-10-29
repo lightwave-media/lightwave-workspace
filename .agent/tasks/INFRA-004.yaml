@@ -1,0 +1,81 @@
+id: INFRA-004
+title: Implement Secrets Management Strategy with AWS Secrets Manager Integration
+description: |
+  Infrastructure code references sensitive values (database passwords, API keys, JWT secrets)
+  but there's no documented strategy for:
+  - Where secrets are stored (AWS Secrets Manager vs SSM Parameter Store)
+  - How Terraform/Terragrunt references secrets securely
+  - Secret rotation procedures
+  - Local development secret access patterns
+  - Emergency secret rotation in case of compromise
+
+  Current deployment.yaml (line 64-68) mentions required env vars but doesn't document
+  secret management. This task establishes the full secret lifecycle management system.
+
+status: Active
+priority: high
+estimated_effort: 10 hours
+tags:
+  - infrastructure
+  - security
+  - secrets-management
+  - aws-secrets-manager
+
+owner: Platform Team / Security Team
+
+acceptance_criteria:
+  - AWS Secrets Manager structure defined and documented
+  - Terragrunt module created for secret management (create/read/rotate)
+  - Migration script created to move existing secrets to Secrets Manager
+  - Secret rotation procedures documented with example code
+  - Local development access pattern documented (AWS CLI commands)
+  - Emergency rotation SOP created with runbook
+  - Secrets naming convention documented in naming_conventions.yaml
+
+related_sops:
+  - SOP_SECRETS_MANAGEMENT.md
+
+related_files:
+  - .agent/metadata/deployment.yaml
+  - .agent/metadata/naming_conventions.yaml
+
+risks_if_not_done:
+  - Secrets stored in plaintext in Terraform state
+  - No audit trail for secret access
+  - Difficult to rotate secrets without downtime
+  - Secrets leaked in logs or error messages
+
+dependencies: []
+
+subtasks:
+  - title: Define AWS Secrets Manager naming convention
+    status: pending
+  - title: Create Terraform module for secret management
+    status: pending
+  - title: Audit existing secrets and credentials
+    status: pending
+  - title: Create migration script to Secrets Manager
+    status: pending
+  - title: Document secret rotation procedures
+    status: pending
+  - title: Document local development access patterns
+    status: pending
+  - title: Create emergency rotation runbook
+    status: pending
+  - title: Update naming_conventions.yaml with secret patterns
+    status: pending
+  - title: Test secret rotation in dev environment
+    status: pending
+
+notes: |
+  SOP has been created at `.agent/sops/SOP_SECRETS_MANAGEMENT.md`
+
+  Naming pattern: /{environment}/{service}/{secret_type}
+  Example: /prod/backend/database_password
+
+  Consider using automatic rotation for:
+  - RDS database passwords (every 30 days)
+  - API keys (every 90 days)
+
+created_at: 2025-10-28
+updated_at: 2025-10-28

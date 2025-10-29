@@ -1,0 +1,80 @@
+id: INFRA-007
+title: Document and Automate Infrastructure Drift Detection
+description: |
+  No mechanism exists to detect when infrastructure configuration drifts from Terraform state:
+  - Manual changes in AWS console not detected
+  - No scheduled drift detection runs
+  - No alerting when drift is detected
+  - No clear procedure for resolving drift
+
+  This creates risk of configuration inconsistencies and unexpected behavior. Terragrunt
+  supports drift detection, but it needs to be scheduled and monitored.
+
+status: Active
+priority: medium
+estimated_effort: 6 hours
+tags:
+  - infrastructure
+  - drift-detection
+  - automation
+  - operations
+
+owner: Platform Team
+
+acceptance_criteria:
+  - GitHub Actions workflow created to run terragrunt plan daily
+  - Workflow detects changes between state and live infrastructure
+  - Slack/email notifications sent when drift detected
+  - SOP created for investigating and resolving drift
+  - Drift detection results stored as artifacts
+  - Dashboard created to track drift over time
+
+related_sops:
+  - SOP_INFRASTRUCTURE_DEPLOYMENT.md
+
+related_files:
+  - Infrastructure/lightwave-infrastructure-live/Makefile
+
+risks_if_not_done:
+  - Manual changes overwritten during next deployment
+  - Configuration drift causes unexpected failures
+  - Infrastructure diverges from documented state
+  - Troubleshooting complicated by unknown configuration
+
+dependencies:
+  - INFRA-003
+
+subtasks:
+  - title: Create GitHub Actions workflow for daily drift detection
+    status: pending
+  - title: Configure drift detection for all environments
+    status: pending
+  - title: Set up notifications for drift detection (Slack/email)
+    status: pending
+  - title: Create SOP for resolving drift
+    status: pending
+  - title: Store drift detection results as workflow artifacts
+    status: pending
+  - title: Create dashboard to track drift over time
+    status: pending
+  - title: Test drift detection in dev environment
+    status: pending
+  - title: Document common drift scenarios and resolutions
+    status: pending
+
+notes: |
+  Drift detection workflow should:
+  - Run daily at 6am UTC
+  - Run terragrunt plan --terragrunt-non-interactive
+  - Parse output for changes
+  - Send notification if changes detected
+  - Store plan output as artifact
+
+  Common drift causes:
+  - Manual changes in AWS console
+  - Auto-scaling adjustments
+  - AWS service updates
+  - Security group rule modifications
+
+created_at: 2025-10-28
+updated_at: 2025-10-28
