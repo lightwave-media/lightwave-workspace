@@ -14,11 +14,12 @@ variables:
 
   # Domain Identifiers
   domains:
-    - "lightwave-media"
-    - "joelschaeffer"
-    - "cineos"
-    - "createos"
-    - "photographyos"
+    - "lightwave-media.ltd" # Used for email and api with api.lightwave-media.ltd
+    - "lightwave-media-site" # Used for the main website with lightwave-media.site
+    - "joelschaeffer.com" # Used for the portfolio website with joelschaeffer.com
+    - "cineos.io" # Used for the cineos website with cineos.io
+    - "createos.io" # Used for the createos website with createos.io
+    - "photographyos.io" # Used for the photographyos website with photographyos.io
 
   # Deprecated/Legacy References (DO NOT USE)
   deprecated:

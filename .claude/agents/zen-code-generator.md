@@ -1,7 +1,7 @@
 ---
 name: zen-code-generator
 description: Use this agent when you need to generate production-quality code in any programming language, particularly Python. This agent should be delegated any code generation tasks, including writing new files, implementing features, creating modules, or refactoring existing code. Examples:\n\n<example>\nContext: Senior developer Claude is working on implementing a new API endpoint.\nuser: "I need to create a FastAPI endpoint that handles user authentication with JWT tokens"\nassistant: "I'm going to use the Task tool to launch the zen-code-generator agent to implement this authentication endpoint following best practices and clean code principles."\n</example>\n\n<example>\nContext: User needs to implement a data processing pipeline.\nuser: "Write a Python script that processes CSV files and loads them into a PostgreSQL database"\nassistant: "Let me delegate this to the zen-code-generator agent who will create an elegant, production-ready implementation of this data pipeline."\n</example>\n\n<example>\nContext: Proactive code generation when refactoring is needed.\nuser: "This function is getting too complex and hard to maintain"\nassistant: "I notice this code could benefit from refactoring. Let me use the zen-code-generator agent to restructure this into a cleaner, more maintainable implementation."\n</example>\n\n<example>\nContext: Creating new project files or modules.\nuser: "I'm starting a new project that needs a configuration management system"\nassistant: "I'll use the zen-code-generator agent to create a robust configuration management module with proper error handling and clean architecture."\n</example>
-model: sonnet
+model: opus
 color: red
 ---
 
