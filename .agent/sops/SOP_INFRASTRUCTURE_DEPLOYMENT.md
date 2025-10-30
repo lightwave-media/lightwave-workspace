@@ -17,13 +17,13 @@
 
 ---
 
-## Non-Production Deployment (dev/staging)
+## Non-Production Deployment
 
 ### Step 1: Prepare Changes
 
 1. Create feature branch:
    ```bash
-   git checkout -b feature/infra/TASK-123-description
+   git checkout -b feature/infrastructure/TASK-123-description
    ```
 
 2. Make infrastructure changes in appropriate modules
@@ -37,9 +37,11 @@
 
 ### Step 2: Local Validation
 
-1. Navigate to environment:
+1. Navigate to environment and service:
    ```bash
-   cd Infrastructure/lightwave-infrastructure-live/non-prod/us-east-1
+   # Navigate to the specific service you're deploying
+   cd Infrastructure/lightwave-infrastructure-live/non-prod/us-east-1/{service}
+   # Example: cd Infrastructure/lightwave-infrastructure-live/non-prod/us-east-1/django-backend
    ```
 
 2. Initialize:
@@ -68,12 +70,12 @@
 
 1. Commit changes:
    ```bash
-   git commit -m "feat(infra): add RDS read replica for performance"
+   git commit -m "feat(infrastructure): add RDS read replica for performance"
    ```
 
 2. Push branch:
    ```bash
-   git push origin feature/infra/TASK-123-description
+   git push origin feature/infrastructure/TASK-123-description
    ```
 
 3. Create PR on GitHub
@@ -92,9 +94,11 @@
 
 1. Merge PR to main
 
-2. Navigate to environment:
+2. Navigate to environment and service:
    ```bash
-   cd Infrastructure/lightwave-infrastructure-live/non-prod/us-east-1
+   # Navigate to the specific service you're deploying
+   cd Infrastructure/lightwave-infrastructure-live/non-prod/us-east-1/{service}
+   # Example: cd Infrastructure/lightwave-infrastructure-live/non-prod/us-east-1/django-backend
    ```
 
 3. Pull latest:
@@ -117,17 +121,17 @@
 
 1. Check application health:
    ```bash
-   curl https://api-staging.lightwave-media.ltd/health
+   curl https://api-nonprod.lightwave-media.ltd/health
    ```
 
 2. Check ECS service status:
    ```bash
-   aws ecs describe-services --cluster lightwave-staging --services backend-staging
+   aws ecs describe-services --cluster lightwave-nonprod --services backend-nonprod
    ```
 
 3. Check RDS status:
    ```bash
-   aws rds describe-db-instances --db-instance-identifier staging-postgres
+   aws rds describe-db-instances --db-instance-identifier nonprod-postgres
    ```
 
 4. Run smoke tests (if exists):
@@ -137,7 +141,7 @@
 
 5. Document deployment in Slack:
    ```
-   ✅ Deployed TASK-123 to staging
+   ✅ Deployed TASK-123 to non-prod
    - Added RDS read replica
    - No issues detected
    ```
@@ -162,7 +166,7 @@ Before starting production deployment, verify:
 
 1. Create branch:
    ```bash
-   git checkout -b release/infra/v1.2.3
+   git checkout -b release/infrastructure/v1.2.3
    ```
 
 2. Cherry-pick or merge tested changes from non-prod
@@ -171,7 +175,9 @@ Before starting production deployment, verify:
 
 4. Run plan:
    ```bash
-   cd Infrastructure/lightwave-infrastructure-live/prod/us-east-1
+   # Navigate to the specific service you're deploying
+   cd Infrastructure/lightwave-infrastructure-live/prod/us-east-1/{service}
+   # Example: cd Infrastructure/lightwave-infrastructure-live/prod/us-east-1/django-backend
    make plan-prod
    ```
 
@@ -243,8 +249,9 @@ Before starting production deployment, verify:
 
 2. For infrastructure rollback:
    ```bash
+   # Navigate to the service that needs rollback
+   cd Infrastructure/lightwave-infrastructure-live/prod/us-east-1/{service}
    # Restore state from backup
-   cd Infrastructure/lightwave-infrastructure-live/prod/us-east-1
    terragrunt state push backup-[timestamp].tfstate
 
    # Run apply to revert
@@ -383,7 +390,7 @@ terragrunt state rm aws_db_instance.main
 
 ### 1. Always Test in Non-Prod First
 
-Never deploy directly to production without testing in staging/dev first.
+Never deploy directly to production without testing in non-prod first.
 
 ### 2. Small, Incremental Changes
 

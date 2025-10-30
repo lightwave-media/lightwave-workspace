@@ -1,0 +1,175 @@
+id: TASK-000
+title: "Django Production Deployment - Critical Blockers Resolution"
+status: Active
+priority: Critical
+category: Infrastructure
+assignee: infrastructure-ops-auditor
+estimated_hours: 8
+
+description: |
+  Meta-task tracking resolution of 7 critical infrastructure blockers identified during
+  pre-deployment audit for Django backend production deployment to AWS.
+
+  These blockers were discovered by infrastructure-ops-auditor during stack validation
+  and must ALL be resolved before production deployment can succeed.
+
+  Current State:
+  - Stack: django-backend-prod (Terragrunt Stacks)
+  - VPC: vpc-02f48c62006cacfae (lightwave-dev-vpc)
+  - Target Environment: Production (AWS us-east-1)
+  - Deployment Method: Terragrunt Stacks with OpenTofu
+
+  Failure Modes:
+  - Security groups will fail to create (missing VPC ID)
+  - RDS will deploy to wrong subnets (missing subnet groups)
+  - ALB will fail to create (no public subnets)
+  - ECS will deploy to default VPC (hardcoded reference)
+  - Stack deployment will fail (missing environment variables)
+  - Application will have no database connectivity (missing security group rules)
+  - DNS automation will fail (missing Cloudflare provider config)
+
+acceptance_criteria:
+  - All 7 sub-tasks (TASK-001 through TASK-007) are completed
+  - All Terraform modules validate successfully (tofu validate)
+  - Stack plan completes without errors (terragrunt stack plan)
+  - All resources deploy to correct VPC (vpc-02f48c62006cacfae)
+  - Database connectivity verified (Django can connect to PostgreSQL and Redis)
+  - DNS automation functional (Cloudflare records created)
+  - No hardcoded VPC references remain in codebase
+
+sub_tasks:
+  - id: TASK-001
+    title: "Fix Security Group Module - Add VPC ID Parameter"
+    status: Active
+    blocking: true
+
+  - id: TASK-002
+    title: "Add PostgreSQL Subnet Groups"
+    status: Active
+    blocking: true
+
+  - id: TASK-003
+    title: "Create Public Subnets in VPC"
+    status: Active
+    blocking: true
+
+  - id: TASK-004
+    title: "Parameterize Django VPC Reference"
+    status: Active
+    blocking: true
+
+  - id: TASK-005
+    title: "Configure Deployment Environment Variables"
+    status: Active
+    blocking: true
+
+  - id: TASK-006
+    title: "Add Security Group Ingress Rules"
+    status: Active
+    blocking: true
+
+  - id: TASK-007
+    title: "Configure Cloudflare Provider"
+    status: Active
+    blocking: true
+
+execution_sequence:
+  phase_1_parallel:
+    description: "Module fixes (no dependencies)"
+    tasks:
+      - TASK-001  # SG module VPC parameter
+      - TASK-002  # PostgreSQL subnet groups
+      - TASK-004  # Django VPC parameterization
+
+  phase_2_infrastructure:
+    description: "VPC infrastructure changes"
+    tasks:
+      - TASK-003  # Create public subnets
+    depends_on:
+      - phase_1_parallel
+
+  phase_3_configuration:
+    description: "Deployment configuration"
+    tasks:
+      - TASK-005  # Environment variables
+      - TASK-007  # Cloudflare provider
+    depends_on:
+      - TASK-003
+
+  phase_4_connectivity:
+    description: "Post-deployment connectivity"
+    tasks:
+      - TASK-006  # Security group rules
+    depends_on:
+      - phase_3_configuration
+    note: "Run after initial stack deployment"
+
+test_validation:
+  - name: "Module Validation"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog
+      for module in modules/sg modules/postgresql modules/django-fargate-service; do
+        cd $module
+        tofu init -backend=false
+        tofu validate
+        cd ../..
+      done
+    expected: "All modules validate successfully"
+
+  - name: "Stack Plan"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/stacks/django-backend-prod
+      # Export all required environment variables first (see TASK-005)
+      terragrunt stack plan
+    expected: "Plan completes without errors, resources target correct VPC"
+
+  - name: "VPC Targeting Verification"
+    command: |
+      # After plan, check that no resources reference default VPC
+      terragrunt stack plan 2>&1 | grep -i "default.*vpc" && echo "ERROR: Default VPC detected" || echo "OK: No default VPC references"
+    expected: "No default VPC references found"
+
+  - name: "Subnet Placement Verification"
+    command: |
+      # Verify PostgreSQL uses DB subnets, Django uses private subnets, ALB uses public subnets
+      terragrunt stack show 2>&1 | grep subnet
+    expected: "Resources in correct subnet tiers"
+
+rollback_plan:
+  - "All changes are in infrastructure-as-code (no live resources affected yet)"
+  - "Git revert to commit before TASK-001 if needed"
+  - "No production impact until stack apply is executed"
+
+documentation_updates:
+  - file: "/Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/README.md"
+    section: "Deployment Prerequisites"
+    add: "Required environment variables for stack deployment"
+
+  - file: "/Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/stacks/django-backend-prod/README.md"
+    create: true
+    content: "Deployment guide with environment variable setup and validation steps"
+
+references:
+  - "Infrastructure pre-deployment audit (2025-10-29)"
+  - "Terraform best practices: VPC parameterization"
+  - "AWS Well-Architected Framework: Security pillar"
+  - "Terragrunt Stacks documentation: https://terragrunt.gruntwork.io/docs/features/stacks/"
+  - "OpenTofu module best practices"
+
+notes: |
+  EXECUTION ORDER MATTERS:
+  - Complete Phases 1-3 BEFORE running stack apply
+  - Phase 4 (TASK-006) can only be executed AFTER stack deployment
+  - This is because security group IDs are only known after resources are created
+
+  VALIDATION CHECKPOINTS:
+  - After Phase 1: Run module validation
+  - After Phase 3: Run stack plan (should succeed)
+  - After stack apply: Run Phase 4
+  - After Phase 4: Test database connectivity
+
+  PRODUCTION DEPLOYMENT:
+  - DO NOT deploy to production until all tests pass
+  - Verify in dev environment first
+  - Monitor CloudWatch during initial deployment
+  - Have rollback plan ready (stack destroy)

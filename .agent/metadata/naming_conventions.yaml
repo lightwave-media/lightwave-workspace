@@ -1074,12 +1074,37 @@ feature_flags:
       - "cache.redis.ttl_seconds"
 
   secret_names:
-    pattern: "{{service}}_{{resource}}_{{credential_type}}"
-    case: "snake_case"
-    examples:
-      - "auth_service_database_password"
-      - "api_gateway_jwt_secret"
-      - "worker_rabbitmq_connection_string"
+    aws_secrets_manager:
+      pattern: "/{{environment}}/{{service}}/{{secret_type}}"
+      case: "snake_case"
+      description: "AWS Secrets Manager naming convention for LightWave infrastructure"
+      rules:
+        - "Always start with forward slash"
+        - "Environment: prod, non-prod"
+        - "Service: backend, frontend, redis, cloudflare, etc."
+        - "Secret type: snake_case descriptive name"
+      examples:
+        - "/prod/backend/database_password"
+        - "/prod/backend/jwt_secret_key"
+        - "/non-prod/redis/auth_token"
+        - "/prod/cloudflare/api_token"
+        - "/non-prod/backend/stripe_api_key"
+      rotation_schedule:
+        database_password: "30 days"
+        api_key: "90 days"
+        jwt_secret: "90 days"
+        service_account: "60 days"
+      validation_regex: "^/[a-z0-9-]+/[a-z0-9-]+/[a-z_]+$"
+
+    legacy_env_var_format:
+      pattern: "{{service}}_{{resource}}_{{credential_type}}"
+      case: "snake_case"
+      deprecated: true
+      note: "Use AWS Secrets Manager pattern for new secrets"
+      examples:
+        - "auth_service_database_password"
+        - "api_gateway_jwt_secret"
+        - "worker_rabbitmq_connection_string"
 
 # =============================================================================
 # ERROR HANDLING

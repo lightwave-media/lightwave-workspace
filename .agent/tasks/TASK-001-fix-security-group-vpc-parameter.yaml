@@ -1,0 +1,164 @@
+id: TASK-001
+title: "Fix Security Group Module - Add VPC ID Parameter"
+status: Active
+priority: Critical
+category: Infrastructure
+assignee: infrastructure-ops-auditor
+estimated_hours: 0.5
+
+description: |
+  The security group module (modules/sg) is missing a critical vpc_id parameter.
+  AWS security groups MUST be associated with a VPC, and without this parameter,
+  resource creation will fail with:
+
+    Error: Missing required argument: vpc_id
+
+  This affects ALL security group creations in the stack:
+  - PostgreSQL database security group
+  - Redis cache security group
+  - Django ECS service security group
+
+  Current Code Problem:
+  - modules/sg/main.tf creates security group without vpc_id
+  - modules/sg/variables.tf does not define vpc_id variable
+  - All callers will fail when attempting to create security groups
+
+acceptance_criteria:
+  - vpc_id variable added to modules/sg/variables.tf with proper type and description
+  - vpc_id parameter added to aws_security_group resource in modules/sg/main.tf
+  - Variable is marked as required (no default value)
+  - Module validates successfully (tofu validate)
+  - All dependent modules (postgresql, redis, django-fargate-service) can pass vpc_id
+  - No breaking changes to module interface (only adds required parameter)
+
+files_to_modify:
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/sg/variables.tf
+    line_number: 4
+    changes: |
+      Add new variable definition after the 'name' variable:
+
+      ```hcl
+      variable "vpc_id" {
+        description = "The VPC ID where the security group will be created"
+        type        = string
+      }
+      ```
+
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/sg/main.tf
+    line_number: 2
+    changes: |
+      Add vpc_id parameter to aws_security_group resource:
+
+      ```hcl
+      resource "aws_security_group" "sg" {
+        name   = var.name
+        vpc_id = var.vpc_id
+      }
+      ```
+
+implementation_code:
+  variables_tf: |
+    # Complete updated variables.tf file
+    variable "name" {
+      description = "The name of the security group"
+      type        = string
+    }
+
+    variable "vpc_id" {
+      description = "The VPC ID where the security group will be created"
+      type        = string
+    }
+
+  main_tf: |
+    # Complete updated main.tf file
+    resource "aws_security_group" "sg" {
+      name   = var.name
+      vpc_id = var.vpc_id
+    }
+
+test_validation:
+  - name: "Module Syntax Validation"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/sg
+      tofu init -backend=false
+      tofu validate
+    expected: "Success! The configuration is valid."
+
+  - name: "Module Interface Check"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/sg
+      tofu console <<EOF
+      var.name
+      var.vpc_id
+      EOF
+    expected: "Both variables should be accessible without errors"
+
+  - name: "Dependent Module Check - PostgreSQL"
+    command: |
+      # Verify PostgreSQL module can pass vpc_id to sg module
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/postgresql
+      grep -n "vpc_id" main.tf
+    expected: "PostgreSQL module already has vpc_id variable available (line 110-113 creates security group)"
+    action: "PostgreSQL module creates its own security group directly - no change needed"
+
+  - name: "Unit Test - PostgreSQL Security Group"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/units/sg
+      cat terragrunt.hcl
+    expected: "Unit configuration should include vpc_id in inputs"
+    note: "Units may need to be updated to pass vpc_id parameter"
+
+downstream_impacts:
+  - module: "units/sg/terragrunt.hcl"
+    impact: "Must add vpc_id to inputs block"
+    required_change: |
+      inputs = {
+        name   = "example-sg"
+        vpc_id = get_env("VPC_ID")
+      }
+
+  - module: "Any custom security group units"
+    impact: "Must pass vpc_id parameter"
+    note: "Check all units that use modules/sg"
+
+rollback_plan:
+  - "Git revert commit if module validation fails"
+  - "No production impact (changes are in module definition only)"
+  - "If reverting, document reason and create new task"
+
+dependencies:
+  - "None - this is a foundational fix"
+
+blocked_by:
+  - "None"
+
+blocks:
+  - "TASK-005 (Environment variables need vpc_id)"
+  - "TASK-006 (Security group rules need SG IDs created with correct VPC)"
+
+references:
+  - "AWS Security Group documentation: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group"
+  - "Terraform module best practices: Required variables"
+  - "Infrastructure audit report (2025-10-29)"
+
+notes: |
+  CRITICAL: This is a foundational fix that unblocks other tasks.
+
+  WHY THIS MATTERS:
+  - Security groups are VPC-scoped resources in AWS
+  - Without vpc_id, AWS will reject the resource creation
+  - This affects 3+ security groups in the stack (PostgreSQL, Redis, Django)
+
+  TESTING STRATEGY:
+  - Validate module syntax with tofu validate
+  - Do NOT run tofu apply until all environment variables are set (TASK-005)
+  - Verify no breaking changes to module interface
+
+  COMMON PITFALL:
+  - Don't forget to update ALL units that use this module
+  - Check units/sg/terragrunt.hcl for example usage
+
+  POST-COMPLETION:
+  - Mark TASK-001 as completed
+  - Unblocks TASK-005 (environment variables)
+  - Verify with infrastructure-ops-auditor that fix is correct

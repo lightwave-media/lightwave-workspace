@@ -1,0 +1,399 @@
+id: TASK-003
+title: "Create Public Subnets in VPC"
+status: Active
+priority: Critical
+category: Infrastructure
+assignee: infrastructure-ops-auditor
+estimated_hours: 2
+
+description: |
+  The lightwave-dev-vpc (vpc-02f48c62006cacfae) is missing public subnets, which are
+  REQUIRED for Application Load Balancer (ALB) deployment.
+
+  Current VPC Configuration:
+  - VPC ID: vpc-02f48c62006cacfae
+  - Region: us-east-1
+  - Existing Subnets:
+    - Private subnets (for ECS Fargate) ✓
+    - Database subnets (for RDS/ElastiCache) ✓
+    - Public subnets (for ALB) ✗ MISSING
+
+  Problem:
+  - Django ECS service creates an ALB for external access
+  - ALB requires subnets with Internet Gateway (IGW) routes
+  - Without public subnets, stack deployment will fail with:
+      "Error: No public subnets found in VPC"
+
+  Required Architecture:
+  - 2 public subnets (Multi-AZ for ALB high availability)
+  - Subnets must be in different AZs (us-east-1a, us-east-1b)
+  - Each subnet needs route to Internet Gateway
+  - CIDR blocks must not overlap with existing subnets
+
+acceptance_criteria:
+  - 2 public subnets created in vpc-02f48c62006cacfae
+  - Subnets span 2 availability zones (us-east-1a, us-east-1b)
+  - Internet Gateway (IGW) attached to VPC (or use existing)
+  - Route table created with 0.0.0.0/0 → IGW route
+  - Route table associated with both public subnets
+  - Subnets tagged appropriately (Name, Tier=Public, Environment)
+  - CIDR blocks do not conflict with existing subnets
+  - Subnets have auto-assign public IP enabled
+  - OpenTofu configuration validates successfully
+
+files_to_create:
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/vpc-public-subnets/main.tf
+    description: "New module to add public subnets to existing VPC"
+    content: |
+      # Add public subnets to an existing VPC
+      # Used when VPC exists but lacks public subnets for ALB
+
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/vpc-public-subnets/variables.tf
+    description: "Module input variables"
+
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/vpc-public-subnets/outputs.tf
+    description: "Module outputs (subnet IDs)"
+
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/units/vpc-public-subnets/terragrunt.hcl
+    description: "Terragrunt unit for deploying public subnets"
+
+implementation_code:
+  main_tf: |
+    # modules/vpc-public-subnets/main.tf
+    # ---------------------------------------------------------------------------------------------------------------------
+    # ADD PUBLIC SUBNETS TO EXISTING VPC
+    # Used when VPC exists but lacks public subnets (required for ALB)
+    # ---------------------------------------------------------------------------------------------------------------------
+
+    # Check if Internet Gateway already exists
+    data "aws_internet_gateway" "existing" {
+      count = var.create_internet_gateway ? 0 : 1
+
+      filter {
+        name   = "attachment.vpc-id"
+        values = [var.vpc_id]
+      }
+    }
+
+    # Create Internet Gateway if needed
+    resource "aws_internet_gateway" "igw" {
+      count  = var.create_internet_gateway ? 1 : 0
+      vpc_id = var.vpc_id
+
+      tags = merge(
+        var.tags,
+        {
+          Name        = "${var.vpc_name}-igw"
+          Environment = var.environment
+        }
+      )
+    }
+
+    # Determine which IGW to use
+    locals {
+      internet_gateway_id = var.create_internet_gateway ? aws_internet_gateway.igw[0].id : data.aws_internet_gateway.existing[0].id
+    }
+
+    # Create public subnets
+    resource "aws_subnet" "public" {
+      count = length(var.subnet_cidrs)
+
+      vpc_id                  = var.vpc_id
+      cidr_block              = var.subnet_cidrs[count.index]
+      availability_zone       = var.availability_zones[count.index]
+      map_public_ip_on_launch = true
+
+      tags = merge(
+        var.tags,
+        {
+          Name        = "${var.vpc_name}-public-subnet-${var.availability_zones[count.index]}"
+          Tier        = "Public"
+          Environment = var.environment
+        }
+      )
+    }
+
+    # Create public route table
+    resource "aws_route_table" "public" {
+      vpc_id = var.vpc_id
+
+      route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = local.internet_gateway_id
+      }
+
+      tags = merge(
+        var.tags,
+        {
+          Name        = "${var.vpc_name}-public-rt"
+          Environment = var.environment
+        }
+      )
+    }
+
+    # Associate route table with public subnets
+    resource "aws_route_table_association" "public" {
+      count = length(aws_subnet.public)
+
+      subnet_id      = aws_subnet.public[count.index].id
+      route_table_id = aws_route_table.public.id
+    }
+
+  variables_tf: |
+    # modules/vpc-public-subnets/variables.tf
+
+    variable "vpc_id" {
+      description = "The VPC ID where public subnets will be created"
+      type        = string
+    }
+
+    variable "vpc_name" {
+      description = "The name of the VPC (used for resource naming)"
+      type        = string
+    }
+
+    variable "subnet_cidrs" {
+      description = "List of CIDR blocks for public subnets (must not overlap with existing)"
+      type        = list(string)
+    }
+
+    variable "availability_zones" {
+      description = "List of availability zones for subnets (must match subnet_cidrs length)"
+      type        = list(string)
+    }
+
+    variable "create_internet_gateway" {
+      description = "Whether to create a new Internet Gateway (false if IGW already exists)"
+      type        = bool
+      default     = true
+    }
+
+    variable "environment" {
+      description = "Environment name (dev, staging, prod)"
+      type        = string
+    }
+
+    variable "tags" {
+      description = "Additional tags for resources"
+      type        = map(string)
+      default     = {}
+    }
+
+  outputs_tf: |
+    # modules/vpc-public-subnets/outputs.tf
+
+    output "public_subnet_ids" {
+      description = "List of public subnet IDs created"
+      value       = aws_subnet.public[*].id
+    }
+
+    output "public_subnet_cidrs" {
+      description = "List of public subnet CIDR blocks"
+      value       = aws_subnet.public[*].cidr_block
+    }
+
+    output "internet_gateway_id" {
+      description = "The Internet Gateway ID (created or existing)"
+      value       = local.internet_gateway_id
+    }
+
+    output "public_route_table_id" {
+      description = "The public route table ID"
+      value       = aws_route_table.public.id
+    }
+
+  unit_terragrunt_hcl: |
+    # units/vpc-public-subnets/terragrunt.hcl
+    terraform {
+      source = "../../modules//vpc-public-subnets"
+    }
+
+    inputs = {
+      vpc_id     = get_env("VPC_ID")
+      vpc_name   = "lightwave-dev"
+
+      # IMPORTANT: These CIDRs must not overlap with existing subnets
+      # Check VPC CIDR and existing subnet allocations first
+      subnet_cidrs = [
+        "10.0.10.0/24",  # Public subnet in us-east-1a
+        "10.0.11.0/24",  # Public subnet in us-east-1b
+      ]
+
+      availability_zones = ["us-east-1a", "us-east-1b"]
+
+      # Set to false if Internet Gateway already exists in VPC
+      create_internet_gateway = true
+
+      environment = "dev"
+
+      tags = {
+        ManagedBy = "Terragrunt"
+        Purpose   = "ALB Public Subnets"
+      }
+    }
+
+cidr_planning:
+  vpc_cidr: "10.0.0.0/16"  # Assumed - verify with: aws ec2 describe-vpcs --vpc-ids vpc-02f48c62006cacfae
+
+  existing_subnets:
+    private_1a: "10.0.0.0/24"  # Example - discover actual CIDRs
+    private_1b: "10.0.1.0/24"
+    db_1a: "10.0.2.0/24"
+    db_1b: "10.0.3.0/24"
+
+  proposed_subnets:
+    public_1a: "10.0.10.0/24"  # 256 IPs (ALB needs ~8 IPs per AZ)
+    public_1b: "10.0.11.0/24"
+
+  verification_command: |
+    export AWS_PROFILE=lightwave-admin-new
+    aws ec2 describe-subnets \
+      --filters "Name=vpc-id,Values=vpc-02f48c62006cacfae" \
+      --query 'Subnets[*].[CidrBlock,AvailabilityZone,Tags[?Key==`Name`].Value|[0]]' \
+      --output table
+
+test_validation:
+  - name: "VPC CIDR Discovery"
+    command: |
+      export AWS_PROFILE=lightwave-admin-new
+      aws ec2 describe-vpcs \
+        --vpc-ids vpc-02f48c62006cacfae \
+        --query 'Vpcs[0].CidrBlock' \
+        --output text
+    expected: "VPC CIDR block (e.g., 10.0.0.0/16)"
+
+  - name: "Existing Subnet Discovery"
+    command: |
+      export AWS_PROFILE=lightwave-admin-new
+      aws ec2 describe-subnets \
+        --filters "Name=vpc-id,Values=vpc-02f48c62006cacfae" \
+        --query 'Subnets[*].[CidrBlock,AvailabilityZone]' \
+        --output table
+    expected: "List of existing subnet CIDRs to avoid conflicts"
+
+  - name: "Internet Gateway Check"
+    command: |
+      export AWS_PROFILE=lightwave-admin-new
+      aws ec2 describe-internet-gateways \
+        --filters "Name=attachment.vpc-id,Values=vpc-02f48c62006cacfae" \
+        --query 'InternetGateways[*].InternetGatewayId' \
+        --output text
+    expected: "IGW ID if exists, empty if needs creation"
+
+  - name: "Module Syntax Validation"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/vpc-public-subnets
+      tofu init -backend=false
+      tofu validate
+    expected: "Success! The configuration is valid."
+
+  - name: "Unit Deployment Plan"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/units/vpc-public-subnets
+      export AWS_PROFILE=lightwave-admin-new
+      export VPC_ID=vpc-02f48c62006cacfae
+      terragrunt plan
+    expected: "Plan shows 2 subnets, 1 route table, route table associations"
+
+  - name: "Post-Deployment Verification"
+    command: |
+      export AWS_PROFILE=lightwave-admin-new
+      aws ec2 describe-subnets \
+        --filters "Name=vpc-id,Values=vpc-02f48c62006cacfae" "Name=tag:Tier,Values=Public" \
+        --query 'Subnets[*].[SubnetId,CidrBlock,AvailabilityZone,MapPublicIpOnLaunch]' \
+        --output table
+    expected: "2 public subnets in different AZs with MapPublicIpOnLaunch=true"
+    run_after: "terragrunt apply"
+
+deployment_steps:
+  step_1:
+    description: "Discover VPC CIDR and existing subnets"
+    commands:
+      - "export AWS_PROFILE=lightwave-admin-new"
+      - "aws ec2 describe-vpcs --vpc-ids vpc-02f48c62006cacfae"
+      - "aws ec2 describe-subnets --filters 'Name=vpc-id,Values=vpc-02f48c62006cacfae'"
+
+  step_2:
+    description: "Choose non-conflicting CIDR blocks"
+    action: "Update unit_terragrunt_hcl subnet_cidrs with available CIDRs"
+
+  step_3:
+    description: "Check for existing Internet Gateway"
+    commands:
+      - "aws ec2 describe-internet-gateways --filters 'Name=attachment.vpc-id,Values=vpc-02f48c62006cacfae'"
+    action: "If IGW exists, set create_internet_gateway = false"
+
+  step_4:
+    description: "Create module and unit files"
+    files:
+      - "modules/vpc-public-subnets/main.tf"
+      - "modules/vpc-public-subnets/variables.tf"
+      - "modules/vpc-public-subnets/outputs.tf"
+      - "units/vpc-public-subnets/terragrunt.hcl"
+
+  step_5:
+    description: "Validate and deploy"
+    commands:
+      - "cd modules/vpc-public-subnets && tofu validate"
+      - "cd ../../units/vpc-public-subnets && terragrunt plan"
+      - "terragrunt apply"
+
+rollback_plan:
+  - "Subnets can be deleted with: terragrunt destroy"
+  - "No impact on existing resources (only adds new subnets)"
+  - "If CIDR conflicts occur, adjust subnet_cidrs and re-plan"
+  - "Document created subnet IDs for environment variables (TASK-005)"
+
+dependencies:
+  - "None - can be completed in parallel with TASK-001 and TASK-002"
+
+blocked_by:
+  - "None"
+
+blocks:
+  - "TASK-005 (Must document PUBLIC_SUBNET_IDS for environment variables)"
+  - "Django ECS service deployment (ALB requires public subnets)"
+
+references:
+  - "AWS VPC Subnets: https://docs.aws.amazon.com/vpc/latest/userguide/configure-subnets.html"
+  - "ALB Subnet Requirements: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancer-getting-started.html"
+  - "Terraform aws_subnet: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/subnet"
+  - "Infrastructure audit report (2025-10-29)"
+
+notes: |
+  CRITICAL: ALB requires public subnets to be internet-accessible.
+
+  WHY THIS MATTERS:
+  - Application Load Balancer must be deployed to public subnets
+  - Public subnets need Internet Gateway routes for inbound traffic
+  - Multi-AZ deployment requires subnets in at least 2 AZs
+  - Without public subnets, stack deployment WILL FAIL
+
+  CIDR PLANNING:
+  - VPC CIDR determines available address space
+  - Public subnets need enough IPs for ALB (recommend /24)
+  - ALB requires ~8 IPs per AZ for internal operations
+  - Avoid overlapping with existing subnet CIDRs
+
+  SECURITY CONSIDERATIONS:
+  - Only ALB should be in public subnets
+  - ECS Fargate tasks remain in private subnets
+  - RDS remains in database subnets
+  - Public subnets have route to IGW, but security groups control access
+
+  TESTING STRATEGY:
+  - Discover existing CIDRs BEFORE creating subnets
+  - Validate CIDR blocks don't conflict
+  - Verify Internet Gateway exists or create new one
+  - Test routing: Public subnet → IGW → Internet
+
+  POST-DEPLOYMENT VALIDATION:
+  - Verify subnets have public IPs enabled
+  - Check route table has 0.0.0.0/0 → IGW
+  - Test connectivity: Deploy test EC2 with public IP, SSH from internet
+  - Document subnet IDs for TASK-005
+
+  PRODUCTION CONSIDERATIONS:
+  - Public subnets should have NACLs for additional security
+  - Consider VPC Flow Logs for traffic monitoring
+  - Tag subnets appropriately for cost allocation

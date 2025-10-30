@@ -18,19 +18,19 @@ environments:
       database: "PostgreSQL (local container)"
       redis: "Redis (local container)"
   
-  staging:
+  non-prod:
     frontend:
       platform: "Cloudflare Pages"
-      url: "https://staging.lightwave-media.site"
-      branch: "staging"
+      url: "https://nonprod.lightwave-media.site"
+      branch: "nonprod"
       auto_deploy: true
-    
+
     backend:
       platform: "AWS ECS Fargate"
-      cluster: "lightwave-staging"
-      service: "backend-staging"
-      url: "https://api-staging.lightwave-media.ltd"
-      database: "RDS PostgreSQL (staging)"
+      cluster: "lightwave-nonprod"
+      service: "backend-nonprod"
+      url: "https://api-nonprod.lightwave-media.ltd"
+      database: "RDS PostgreSQL (non-prod)"
   
   production:
     frontend:

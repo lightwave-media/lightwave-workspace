@@ -1,0 +1,309 @@
+id: TASK-004
+title: "Parameterize Django VPC Reference"
+status: Active
+priority: Critical
+category: Infrastructure
+assignee: infrastructure-ops-auditor
+estimated_hours: 0.5
+
+description: |
+  The Django Fargate service module (modules/django-fargate-service) has a HARDCODED
+  reference to AWS default VPC in dependencies.tf (lines 6-8).
+
+  Current Code Problem:
+  ```hcl
+  data "aws_vpc" "default" {
+    default = true  # ← HARDCODED to default VPC
+  }
+  ```
+
+  This causes:
+  1. ECS service deploys to WRONG VPC (default instead of lightwave-dev-vpc)
+  2. Security groups created in wrong VPC
+  3. Subnet lookups return wrong subnets
+  4. ALB created in wrong VPC (cannot communicate with ECS tasks)
+
+  Impact:
+  - All Django stack resources deploy to default VPC
+  - Cannot connect to PostgreSQL (in different VPC)
+  - Cannot connect to Redis (in different VPC)
+  - Complete deployment failure due to network isolation
+
+  Required Fix:
+  - Replace hardcoded default VPC data source with parameterized lookup
+  - Add vpc_id variable to module
+  - Update data source to use var.vpc_id instead of default = true
+
+acceptance_criteria:
+  - vpc_id variable added to modules/django-fargate-service/variables.tf
+  - Data source in dependencies.tf uses vpc_id parameter instead of default = true
+  - No hardcoded VPC references remain in module
+  - Module validates successfully (tofu validate)
+  - Plan shows resources deploying to correct VPC (vpc-02f48c62006cacfae)
+  - No breaking changes to module outputs
+
+files_to_modify:
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/django-fargate-service/variables.tf
+    changes: |
+      Add vpc_id variable (near top of file with other infrastructure variables):
+
+      ```hcl
+      variable "vpc_id" {
+        description = "The VPC ID where the ECS service, ALB, and security groups will be deployed"
+        type        = string
+      }
+      ```
+
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/django-fargate-service/dependencies.tf
+    line_number: 6-8
+    changes: |
+      Replace hardcoded default VPC data source with parameterized lookup:
+
+      BEFORE:
+      ```hcl
+      data "aws_vpc" "default" {
+        default = true
+      }
+      ```
+
+      AFTER:
+      ```hcl
+      data "aws_vpc" "selected" {
+        id = var.vpc_id
+      }
+      ```
+
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/django-fargate-service/dependencies.tf
+    line_number: 10-15
+    changes: |
+      Update subnet data sources to use correct VPC reference:
+
+      BEFORE:
+      ```hcl
+      data "aws_subnets" "default" {
+        filter {
+          name   = "vpc-id"
+          values = [data.aws_vpc.default.id]
+        }
+      }
+
+      data "aws_subnet" "default" {
+        for_each = toset(data.aws_subnets.default.ids)
+        id       = each.value
+      }
+      ```
+
+      AFTER:
+      ```hcl
+      data "aws_subnets" "private" {
+        filter {
+          name   = "vpc-id"
+          values = [data.aws_vpc.selected.id]
+        }
+      }
+
+      data "aws_subnet" "private" {
+        for_each = toset(data.aws_subnets.private.ids)
+        id       = each.value
+      }
+      ```
+
+      Note: Rename from "default" to "private" for clarity
+
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/django-fargate-service/*.tf
+    changes: |
+      Search and replace all references to data.aws_vpc.default → data.aws_vpc.selected
+      Search and replace all references to data.aws_subnets.default → data.aws_subnets.private
+      Search and replace all references to data.aws_subnet.default → data.aws_subnet.private
+
+implementation_code:
+  dependencies_tf_complete: |
+    # modules/django-fargate-service/dependencies.tf
+    # ---------------------------------------------------------------------------------------------------------------------
+    # DATA SOURCES
+    # These data sources are used to fetch information about the AWS environment
+    # ---------------------------------------------------------------------------------------------------------------------
+
+    # Fetch VPC information using provided VPC ID
+    data "aws_vpc" "selected" {
+      id = var.vpc_id
+    }
+
+    # Fetch private subnets in the selected VPC
+    data "aws_subnets" "private" {
+      filter {
+        name   = "vpc-id"
+        values = [data.aws_vpc.selected.id]
+      }
+    }
+
+    # Fetch subnet details for each private subnet
+    data "aws_subnet" "private" {
+      for_each = toset(data.aws_subnets.private.ids)
+      id       = each.value
+    }
+
+    data "aws_region" "current" {}
+
+    data "aws_caller_identity" "current" {}
+
+  variables_tf_addition: |
+    # Add to modules/django-fargate-service/variables.tf
+
+    variable "vpc_id" {
+      description = "The VPC ID where the ECS service, ALB, and security groups will be deployed"
+      type        = string
+    }
+
+search_and_replace_targets:
+  vpc_reference:
+    old: "data.aws_vpc.default"
+    new: "data.aws_vpc.selected"
+    files:
+      - "modules/django-fargate-service/main.tf"
+      - "modules/django-fargate-service/security-groups.tf"
+      - "modules/django-fargate-service/alb.tf"
+      - "modules/django-fargate-service/outputs.tf"
+
+  subnets_reference:
+    old: "data.aws_subnets.default"
+    new: "data.aws_subnets.private"
+    files:
+      - "modules/django-fargate-service/main.tf"
+      - "modules/django-fargate-service/alb.tf"
+
+  subnet_reference:
+    old: "data.aws_subnet.default"
+    new: "data.aws_subnet.private"
+    files:
+      - "modules/django-fargate-service/main.tf"
+
+test_validation:
+  - name: "Check for Hardcoded VPC References"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/django-fargate-service
+      grep -rn "default.*=.*true" . --include="*.tf"
+    expected: "No matches (all hardcoded references removed)"
+
+  - name: "Verify VPC Variable Defined"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/django-fargate-service
+      grep -A 3 "variable \"vpc_id\"" variables.tf
+    expected: "vpc_id variable with type string"
+
+  - name: "Verify Data Source Uses Variable"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/django-fargate-service
+      grep -A 2 "data \"aws_vpc\" \"selected\"" dependencies.tf
+    expected: "Data source references var.vpc_id"
+
+  - name: "Module Syntax Validation"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/django-fargate-service
+      tofu init -backend=false
+      tofu validate
+    expected: "Success! The configuration is valid."
+
+  - name: "Search for Remaining Default References"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/django-fargate-service
+      grep -rn "\.default\." . --include="*.tf"
+    expected: "No matches (all .default. references replaced with .selected. or .private.)"
+
+  - name: "Verify No Breaking Output Changes"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/django-fargate-service
+      grep -A 2 "output" outputs.tf
+    expected: "Output names remain unchanged (only internal references updated)"
+
+downstream_impacts:
+  - module: "units/django-fargate-stateful-service/terragrunt.hcl"
+    impact: "Must add vpc_id to inputs"
+    required_change: |
+      inputs = {
+        name   = "example-django"
+        vpc_id = get_env("VPC_ID")
+        # ... other inputs ...
+      }
+
+  - module: "stacks/django-backend-prod/terragrunt.stack.hcl"
+    impact: "Django service unit must pass vpc_id"
+    required_change: |
+      unit "django_service" {
+        path = "../../units/django-fargate-stateful-service"
+        inputs = {
+          # ... existing inputs ...
+          vpc_id = get_env("VPC_ID")
+        }
+      }
+    line_number: 125
+
+verification_after_fix:
+  command: |
+    # After fix, verify VPC targeting in plan
+    cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/stacks/django-backend-prod
+    export VPC_ID=vpc-02f48c62006cacfae
+    export AWS_PROFILE=lightwave-admin-new
+    # ... export other required env vars ...
+    terragrunt stack plan 2>&1 | grep -i "vpc-02f48c62006cacfae"
+  expected: "Plan references correct VPC ID (vpc-02f48c62006cacfae), not default VPC"
+
+rollback_plan:
+  - "Git revert commit if module validation fails"
+  - "No production impact (no resources deployed yet)"
+  - "Revert is simple: restore dependencies.tf to original state"
+
+dependencies:
+  - "None - can be completed in parallel with TASK-001 and TASK-002"
+
+blocked_by:
+  - "None"
+
+blocks:
+  - "TASK-005 (Must document VPC_ID environment variable)"
+  - "Django ECS service deployment (wrong VPC = complete failure)"
+
+references:
+  - "Terraform data source best practices"
+  - "AWS VPC documentation"
+  - "Infrastructure audit report (2025-10-29)"
+  - "Terraform aws_vpc data source: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/vpc"
+
+notes: |
+  CRITICAL: Hardcoded default VPC is a SHOWSTOPPER bug.
+
+  WHY THIS MATTERS:
+  - Default VPC is AWS-managed and should NEVER be used for production
+  - Resources in different VPCs cannot communicate (network isolation)
+  - Security groups are VPC-scoped (cannot be shared across VPCs)
+  - This bug would cause complete deployment failure in production
+
+  IMPACT ANALYSIS:
+  Before fix:
+  - Django ECS → Default VPC
+  - PostgreSQL → lightwave-dev-vpc (from TASK-002)
+  - Redis → lightwave-dev-vpc
+  - Result: Django cannot connect to database (different VPCs)
+
+  After fix:
+  - Django ECS → lightwave-dev-vpc
+  - PostgreSQL → lightwave-dev-vpc
+  - Redis → lightwave-dev-vpc
+  - Result: All resources in same VPC, can communicate
+
+  TESTING STRATEGY:
+  1. Grep for all hardcoded references (default = true, .default.)
+  2. Replace with parameterized references
+  3. Validate module syntax
+  4. Run stack plan with correct VPC_ID
+  5. Verify plan shows correct VPC targeting
+
+  COMMON PITFALL:
+  - Don't forget to update ALL files that reference data.aws_vpc.default
+  - Use search-and-replace to ensure consistency
+  - Test that outputs still work (shouldn't reference internal data sources by name)
+
+  POST-COMPLETION:
+  - Update TASK-005 to document VPC_ID environment variable requirement
+  - Run full stack plan to verify VPC targeting
+  - Document VPC ID for future deployments

@@ -62,7 +62,9 @@
 
 1. Navigate to infrastructure directory:
    ```bash
+   # Navigate to environment root to verify all services
    cd Infrastructure/lightwave-infrastructure-live/non-prod/us-east-1
+   # Or navigate to specific service: cd Infrastructure/lightwave-infrastructure-live/non-prod/us-east-1/{service}
    ```
 
 2. Run initialization:

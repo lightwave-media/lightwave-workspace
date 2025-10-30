@@ -27,14 +27,14 @@
 
 - `/prod/backend/database_password`
 - `/prod/backend/jwt_secret_key`
-- `/staging/redis/auth_token`
+- `/non-prod/redis/auth_token`
 - `/prod/cloudflare/api_token`
-- `/dev/backend/stripe_api_key`
+- `/non-prod/backend/stripe_api_key`
 
 ### Rules
 
 - Use **snake_case** for secret names
-- Always include **environment prefix** (`/prod/`, `/staging/`, `/dev/`)
+- Always include **environment prefix** (`/prod/`, `/non-prod/`)
 - Never include actual secret values in name
 - Use descriptive secret types (`database_password`, not `db_pw`)
 
@@ -54,28 +54,28 @@ Use for quick development/testing secrets:
 2. Create in AWS Secrets Manager:
    ```bash
    aws secretsmanager create-secret \
-     --name /dev/backend/database_password \
+     --name /non-prod/backend/database_password \
      --secret-string 'your-generated-password-here'
    ```
 
 3. Add description:
    ```bash
    aws secretsmanager update-secret \
-     --secret-id /dev/backend/database_password \
-     --description 'PostgreSQL password for dev backend'
+     --secret-id /non-prod/backend/database_password \
+     --description 'PostgreSQL password for non-prod backend'
    ```
 
 4. Tag secret:
    ```bash
    aws secretsmanager tag-resource \
-     --secret-id /dev/backend/database_password \
-     --tags Key=Environment,Value=dev Key=ManagedBy,Value=Manual
+     --secret-id /non-prod/backend/database_password \
+     --tags Key=Environment,Value=non-prod Key=ManagedBy,Value=Manual
    ```
 
 5. Verify creation:
    ```bash
    aws secretsmanager describe-secret \
-     --secret-id /dev/backend/database_password
+     --secret-id /non-prod/backend/database_password
    ```
 
 ### Method 2: Terraform-Managed Secrets (Production)
@@ -469,7 +469,7 @@ export async function GET() {
    ```
 
 4. Document incident in security log:
-   - Create file: `.agent/security-incidents/incident-YYYY-MM-DD.md`
+   - Create file: `.claude/incidents/incident-YYYY-MM-DD.md`
    - Include timeline, root cause, remediation steps
 
 5. Create task to prevent recurrence:
@@ -487,7 +487,7 @@ Developers need access to secrets for local development. **Never hardcode secret
 ```bash
 export AWS_PROFILE=lightwave-admin-new
 aws secretsmanager get-secret-value \
-  --secret-id /dev/backend/database_password \
+  --secret-id /non-prod/backend/database_password \
   --query SecretString \
   --output text
 ```
@@ -505,9 +505,9 @@ export AWS_PROFILE=lightwave-admin-new
 
 echo "Loading development secrets..."
 
-export DATABASE_PASSWORD=$(aws secretsmanager get-secret-value --secret-id /dev/backend/database_password --query SecretString --output text)
-export JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id /dev/backend/jwt_secret --query SecretString --output text)
-export REDIS_AUTH_TOKEN=$(aws secretsmanager get-secret-value --secret-id /dev/redis/auth_token --query SecretString --output text)
+export DATABASE_PASSWORD=$(aws secretsmanager get-secret-value --secret-id /non-prod/backend/database_password --query SecretString --output text)
+export JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id /non-prod/backend/jwt_secret --query SecretString --output text)
+export REDIS_AUTH_TOKEN=$(aws secretsmanager get-secret-value --secret-id /non-prod/redis/auth_token --query SecretString --output text)
 
 echo "✅ Secrets loaded into environment"
 ```
@@ -527,10 +527,10 @@ brew install chamber
 
 Usage:
 ```bash
-chamber exec /dev/backend -- python manage.py runserver
+chamber exec /non-prod/backend -- python manage.py runserver
 ```
 
-Chamber automatically loads all secrets with prefix `/dev/backend/` into environment.
+Chamber automatically loads all secrets with prefix `/non-prod/backend/` into environment.
 
 ---
 
@@ -587,25 +587,25 @@ Secrets Manager supports two formats:
 **1. Plain string:**
 ```bash
 aws secretsmanager create-secret \
-  --name /dev/backend/api_key \
+  --name /non-prod/backend/api_key \
   --secret-string 'sk_test_abc123'
 ```
 
 Retrieve:
 ```python
-secret = get_secret('/dev/backend/api_key')  # Returns: "sk_test_abc123"
+secret = get_secret('/non-prod/backend/api_key')  # Returns: "sk_test_abc123"
 ```
 
 **2. JSON object:**
 ```bash
 aws secretsmanager create-secret \
-  --name /dev/backend/database \
+  --name /non-prod/backend/database \
   --secret-string '{"username":"admin","password":"secret123"}'
 ```
 
 Retrieve:
 ```python
-secret = get_secret('/dev/backend/database')
+secret = get_secret('/non-prod/backend/database')
 db_creds = json.loads(secret)  # Returns: {"username": "admin", "password": "secret123"}
 ```
 
@@ -660,7 +660,7 @@ aws cloudtrail lookup-events \
 ### 5. Tag All Secrets Consistently
 
 Required tags:
-- `Environment`: prod/staging/dev
+- `Environment`: prod/non-prod
 - `ManagedBy`: Terraform/Manual
 - `Service`: backend/frontend/redis
 - `SecretType`: database_password/api_key/etc

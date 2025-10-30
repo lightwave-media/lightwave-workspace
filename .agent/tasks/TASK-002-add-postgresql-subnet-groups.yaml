@@ -1,0 +1,280 @@
+id: TASK-002
+title: "Add PostgreSQL Subnet Groups"
+status: Active
+priority: Critical
+category: Infrastructure
+assignee: infrastructure-ops-auditor
+estimated_hours: 1
+
+description: |
+  The PostgreSQL module (modules/postgresql) is missing DB subnet group configuration.
+  Without a subnet group, RDS will deploy to AWS default subnets, which are:
+
+  1. Wrong VPC (default VPC instead of lightwave-dev-vpc)
+  2. Wrong subnet tier (public instead of database-tier private)
+  3. Security risk (database exposed to internet-routable subnets)
+
+  Current Code Problem:
+  - modules/postgresql/main.tf (line 5-49) creates RDS instance without db_subnet_group_name
+  - No aws_db_subnet_group resource defined
+  - No subnet_ids variable to receive database subnet IDs
+
+  Required VPC Configuration:
+  - VPC: vpc-02f48c62006cacfae (lightwave-dev-vpc)
+  - Database Subnets (existing):
+    - subnet-0123456789abcdef0 (us-east-1a) [exact ID from VPC]
+    - subnet-0987654321fedcba0 (us-east-1b) [exact ID from VPC]
+  - Subnet Tier: Database-specific (isolated from application)
+
+acceptance_criteria:
+  - subnet_ids variable added to modules/postgresql/variables.tf
+  - aws_db_subnet_group resource created in modules/postgresql/main.tf
+  - RDS instance references db_subnet_group_name parameter
+  - Subnet group spans multiple AZs (us-east-1a, us-east-1b)
+  - Module validates successfully (tofu validate)
+  - Plan shows RDS deploying to database subnets (not default)
+  - No breaking changes to module outputs
+
+files_to_modify:
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/postgresql/variables.tf
+    changes: |
+      Add new variable for subnet IDs (add after existing variables):
+
+      ```hcl
+      variable "subnet_ids" {
+        description = "List of subnet IDs for the DB subnet group (must be in at least 2 AZs)"
+        type        = list(string)
+      }
+      ```
+
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/postgresql/main.tf
+    line_number: 4
+    changes: |
+      Add DB subnet group resource BEFORE the aws_db_instance resource:
+
+      ```hcl
+      # ---------------------------------------------------------------------------------------------------------------------
+      # CREATE DB SUBNET GROUP
+      # RDS requires a subnet group to deploy to specific subnets in the VPC
+      # ---------------------------------------------------------------------------------------------------------------------
+
+      resource "aws_db_subnet_group" "postgresql" {
+        name       = "${var.name}-subnet-group"
+        subnet_ids = var.subnet_ids
+
+        tags = merge(
+          var.tags,
+          {
+            Name        = "${var.name}-subnet-group"
+            Environment = var.environment
+          }
+        )
+      }
+      ```
+
+    line_number: 5
+    changes: |
+      Add db_subnet_group_name parameter to aws_db_instance resource (after line 5):
+
+      ```hcl
+      resource "aws_db_instance" "postgresql" {
+        engine         = "postgres"
+        engine_version = var.engine_version
+
+        db_name  = var.name
+        username = var.master_username
+        password = var.master_password
+
+        instance_class    = var.instance_class
+        allocated_storage = var.allocated_storage
+        storage_type      = var.storage_type
+
+        # Subnet placement - CRITICAL: Deploy to database subnets
+        db_subnet_group_name = aws_db_subnet_group.postgresql.name
+
+        # ... rest of configuration remains unchanged
+      }
+      ```
+
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/postgresql/main.tf
+    line_number: 110
+    changes: |
+      Add vpc_id parameter to security group (line 110-113):
+
+      ```hcl
+      resource "aws_security_group" "db" {
+        name        = "${var.name}-db"
+        description = "Security group for ${var.name} PostgreSQL database"
+        vpc_id      = var.vpc_id  # ADD THIS LINE
+
+        tags = merge(
+          var.tags,
+          {
+            Name        = "${var.name}-db"
+            Environment = var.environment
+          }
+        )
+      }
+      ```
+
+  - path: /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/postgresql/variables.tf
+    changes: |
+      Add vpc_id variable (required for security group):
+
+      ```hcl
+      variable "vpc_id" {
+        description = "The VPC ID where the database and security group will be created"
+        type        = string
+      }
+      ```
+
+implementation_code:
+  db_subnet_group_resource: |
+    resource "aws_db_subnet_group" "postgresql" {
+      name       = "${var.name}-subnet-group"
+      subnet_ids = var.subnet_ids
+
+      tags = merge(
+        var.tags,
+        {
+          Name        = "${var.name}-subnet-group"
+          Environment = var.environment
+        }
+      )
+    }
+
+  rds_instance_update: |
+    resource "aws_db_instance" "postgresql" {
+      # ... existing configuration ...
+
+      # Add this line after storage_type
+      db_subnet_group_name = aws_db_subnet_group.postgresql.name
+
+      # ... rest of configuration ...
+    }
+
+  security_group_update: |
+    resource "aws_security_group" "db" {
+      name        = "${var.name}-db"
+      description = "Security group for ${var.name} PostgreSQL database"
+      vpc_id      = var.vpc_id  # REQUIRED
+
+      tags = merge(
+        var.tags,
+        {
+          Name        = "${var.name}-db"
+          Environment = var.environment
+        }
+      )
+    }
+
+test_validation:
+  - name: "Module Syntax Validation"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/postgresql
+      tofu init -backend=false
+      tofu validate
+    expected: "Success! The configuration is valid."
+
+  - name: "Variable Definition Check"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/postgresql
+      grep -A 3 "variable \"subnet_ids\"" variables.tf
+      grep -A 3 "variable \"vpc_id\"" variables.tf
+    expected: "Both variables defined with correct types"
+
+  - name: "Subnet Group Reference Check"
+    command: |
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/postgresql
+      grep "db_subnet_group_name" main.tf
+    expected: "RDS instance references aws_db_subnet_group.postgresql.name"
+
+  - name: "Multi-AZ Requirement Check"
+    command: |
+      # Verify subnet_ids accepts list (required for multi-AZ)
+      cd /Users/joelschaeffer/dev/lightwave-workspace/Infrastructure/lightwave-infrastructure-catalog/modules/postgresql
+      grep "list(string)" variables.tf | grep subnet_ids
+    expected: "subnet_ids is type list(string)"
+
+downstream_impacts:
+  - module: "units/postgresql/terragrunt.hcl"
+    impact: "Must add subnet_ids and vpc_id to inputs"
+    required_change: |
+      inputs = {
+        name       = "example-db"
+        vpc_id     = get_env("VPC_ID")
+        subnet_ids = split(",", get_env("DB_SUBNET_IDS"))
+        # ... other inputs ...
+      }
+
+  - module: "stacks/django-backend-prod/terragrunt.stack.hcl"
+    impact: "PostgreSQL unit must receive subnet_ids and vpc_id"
+    required_change: |
+      unit "postgresql" {
+        path = "../../units/postgresql"
+        inputs = {
+          # ... existing inputs ...
+          vpc_id     = get_env("VPC_ID")
+          subnet_ids = split(",", get_env("DB_SUBNET_IDS"))
+        }
+      }
+
+database_subnet_discovery:
+  command: |
+    # Run this to discover database subnet IDs in VPC
+    export AWS_PROFILE=lightwave-admin-new
+    aws ec2 describe-subnets \
+      --filters "Name=vpc-id,Values=vpc-02f48c62006cacfae" "Name=tag:Tier,Values=Database" \
+      --query 'Subnets[*].[SubnetId,AvailabilityZone,Tags[?Key==`Name`].Value|[0]]' \
+      --output table
+  expected_output: |
+    subnet-XXXXXXXX | us-east-1a | lightwave-dev-db-subnet-1a
+    subnet-YYYYYYYY | us-east-1b | lightwave-dev-db-subnet-1b
+
+rollback_plan:
+  - "Git revert commit if module validation fails"
+  - "No production impact (RDS not deployed yet)"
+  - "If subnet IDs are wrong, update environment variables (TASK-005)"
+
+dependencies:
+  - "None - can be completed in parallel with TASK-001"
+
+blocked_by:
+  - "None"
+
+blocks:
+  - "TASK-005 (Must know DB_SUBNET_IDS environment variable required)"
+
+references:
+  - "AWS RDS Subnet Groups: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.WorkingWithRDSInstanceinaVPC.html"
+  - "Terraform aws_db_subnet_group: https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_subnet_group"
+  - "Infrastructure audit report (2025-10-29)"
+
+notes: |
+  CRITICAL: Database subnet placement is a security requirement.
+
+  WHY THIS MATTERS:
+  - Production databases should NEVER be in public subnets
+  - Database subnets have restricted routing tables (no internet access)
+  - RDS backup and maintenance require specific subnet configurations
+  - Multi-AZ deployments require subnets in at least 2 AZs
+
+  SUBNET ARCHITECTURE:
+  - Public subnets: ALB, NAT Gateway
+  - Private subnets: ECS Fargate (Django)
+  - Database subnets: RDS PostgreSQL, ElastiCache Redis
+
+  TESTING STRATEGY:
+  - Validate module syntax first
+  - Verify subnet IDs exist in VPC before deployment
+  - Confirm subnets span multiple AZs for Multi-AZ RDS
+  - Check subnet routing tables (should NOT have route to Internet Gateway)
+
+  PRODUCTION VALIDATION:
+  - After deployment, verify RDS is in correct subnets:
+    aws rds describe-db-instances --db-instance-identifier lightwave-django-prod \
+      --query 'DBInstances[0].DBSubnetGroup.Subnets[*].[SubnetIdentifier,SubnetAvailabilityZone.Name]'
+
+  POST-COMPLETION:
+  - Update TASK-005 with required DB_SUBNET_IDS environment variable
+  - Document subnet discovery process for future deployments

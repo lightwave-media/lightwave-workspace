@@ -11,8 +11,7 @@
 
 | Environment | RTO (max downtime) | RPO (max data loss) |
 |-------------|-------------------|---------------------|
-| Development | 8 hours          | 24 hours            |
-| Staging     | 2 hours          | 4 hours             |
+| Non-Production | 8 hours       | 24 hours            |
 | Production  | 30 minutes       | 5 minutes           |
 
 These targets drive backup frequency and recovery procedures.
@@ -172,6 +171,7 @@ aws s3api get-bucket-versioning \
 
 2. **Activate DR region (us-west-2):**
    ```bash
+   # Navigate to DR region (ensure infrastructure exists in us-west-2)
    cd Infrastructure/lightwave-infrastructure-live/prod/us-west-2
    export AWS_PROFILE=lightwave-admin-new
 
@@ -256,10 +256,11 @@ aws s3api get-bucket-versioning \
 
 3. **Restore infrastructure from code:**
    ```bash
+   # Navigate to production infrastructure
    cd Infrastructure/lightwave-infrastructure-live/prod/us-east-1
    export AWS_PROFILE=lightwave-admin-new
 
-   # Restore all infrastructure
+   # Restore all infrastructure (runs across all services)
    terragrunt run-all apply --terragrunt-non-interactive
    ```
 
@@ -296,7 +297,7 @@ aws s3api get-bucket-versioning \
    ```
 
 8. **Document incident and implement safeguards:**
-   - Create file: `.agent/security-incidents/incident-YYYY-MM-DD.md`
+   - Create file: `.claude/incidents/incident-YYYY-MM-DD.md`
    - Add MFA requirements for destructive actions
    - Implement AWS Organizations SCPs to prevent deletion
 
